@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Fixed Precision Planner</title>
+    <title>Shared Precision Planner</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -46,6 +46,7 @@
 
         button { border: none; border-radius: 6px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
+        .btn-share { background: #10b981; color: white; }
         .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
     </style>
 </head>
@@ -57,7 +58,7 @@
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
     <input type="color" id="color" value="#6366f1">
     <button class="btn-add" onclick="addTask()">Add Task</button>
-    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">Click grid cells to toggle holidays</span>
+    <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
 <div class="timeline-container">
@@ -66,13 +67,12 @@
 </div>
 
 <script>
-    // Version 10 - Fixed Timezone Logic
-    let tasks = JSON.parse(localStorage.getItem('myTasks_v10')) || [];
-    let holidays = JSON.parse(localStorage.getItem('myHolidays_v10')) || [];
+    // Version 11 - URL-based Sharing System
+    let tasks = [];
+    let holidays = [];
     
-    // Create dates carefully using local time components
-    const startRange = new Date(2025, 11, 17); // Dec 17
-    const endRange = new Date(2026, 0, 31);   // Jan 31
+    const startRange = new Date(2025, 11, 17);
+    const endRange = new Date(2026, 0, 31);
     const cellW = 60;
     const labelW = 200;
 
@@ -83,6 +83,30 @@
     function fromISO(s) {
         const parts = s.split('-');
         return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    // LOAD DATA FROM URL OR LOCALSTORAGE
+    function loadData() {
+        const params = new URLSearchParams(window.location.search);
+        const data = params.get('data');
+        if (data) {
+            try {
+                const decoded = JSON.parse(atob(data));
+                tasks = decoded.tasks;
+                holidays = decoded.holidays;
+                saveLocally(); // Sync the URL data to local storage
+            } catch(e) { console.error("Invalid share link"); }
+        } else {
+            tasks = JSON.parse(localStorage.getItem('shared_tasks')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays')) || [];
+        }
+    }
+
+    function generateShareLink() {
+        const data = btoa(JSON.stringify({ tasks, holidays }));
+        const url = window.location.origin + window.location.pathname + "?data=" + data;
+        navigator.clipboard.writeText(url);
+        alert("Share Link Copied! Send this URL to your manager.");
     }
 
     function getDays() {
@@ -125,7 +149,6 @@
             group.className = 'task-group';
             group.style.setProperty('--task-color', t.color);
             
-            // VISUAL SHIFT: If task starts on a holiday, push visual bar forward
             let visualStart = fromISO(t.start);
             while (holidays.includes(toISO(visualStart))) {
                 visualStart.setDate(visualStart.getDate() + 1);
@@ -175,7 +198,7 @@
                         render();
                     }
                 };
-                document.onmouseup = () => { document.onmousemove = null; save(); };
+                document.onmouseup = () => { document.onmousemove = null; saveLocally(); };
             };
 
             row.appendChild(group);
@@ -186,25 +209,27 @@
     function toggleHoliday(dateStr) {
         const i = holidays.indexOf(dateStr);
         i > -1 ? holidays.splice(i, 1) : holidays.push(dateStr);
-        save(); render();
+        saveLocally(); render();
     }
 
     function addTask() {
         const name = document.getElementById('name').value;
-        const start = document.getElementById('date').value; // Returns YYYY-MM-DD
+        const start = document.getElementById('date').value;
         const dur = parseFloat(document.getElementById('dur').value);
         if (name && start && !isNaN(dur)) {
             tasks.push({ name, start, dur, color: document.getElementById('color').value });
-            save(); render();
+            saveLocally(); render();
         }
     }
 
-    function deleteTask(idx) { tasks.splice(idx, 1); save(); render(); }
-    function save() {
-        localStorage.setItem('myTasks_v10', JSON.stringify(tasks));
-        localStorage.setItem('myHolidays_v10', JSON.stringify(holidays));
+    function deleteTask(idx) { tasks.splice(idx, 1); saveLocally(); render(); }
+    
+    function saveLocally() {
+        localStorage.setItem('shared_tasks', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays', JSON.stringify(holidays));
     }
 
+    loadData();
     render();
 </script>
 </body>
