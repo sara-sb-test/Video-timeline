@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Conflict-Pro Planner v17</title>
+    <title>Precision Sync Planner v18</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -13,10 +13,7 @@
         
         .controls { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
         
-        /* Modern Date Picker Style */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1); cursor: pointer;
-        }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 150px; }
         
         .palette { display: grid; grid-template-columns: repeat(6, 25px); gap: 5px; }
@@ -33,19 +30,15 @@
 
         .holiday { background: var(--holiday-bg) !important; }
         .holiday::after { content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 12px 12px 0; border-color: transparent var(--holiday-marker) transparent transparent; }
-        .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 16px; z-index: 20; }
         
-        /* Task Bars with Resize handle */
-        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; }
+        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; left: var(--label-w); }
         .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); position: relative; }
         .segment-start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-        .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; position: relative; }
+        .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
         
-        /* Resize Handle */
-        .resizer { position: absolute; right: 0; top: 0; width: 10px; height: 100%; cursor: ew-resize; z-index: 20; }
+        .resizer { position: absolute; right: 0; top: 0; width: 12px; height: 100%; cursor: ew-resize; z-index: 25; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
-
-        .bar-alert { font-size: 30px; position: absolute; z-index: 5; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .bar-alert { font-size: 28px; position: absolute; z-index: 5; text-shadow: 0 0 10px rgba(0,0,0,0.8); }
 
         button { border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
@@ -59,15 +52,13 @@
     <input type="text" id="name" placeholder="Task Name">
     <input type="date" id="date" value="2025-12-17">
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
-    
     <div class="palette" id="palette"></div>
-    
     <button class="btn-add" onclick="addTask()">Add Task</button>
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
 <div class="section-header">INDIVIDUAL TASK BREAKDOWN</div>
-<div class="timeline-container" id="containerTop">
+<div class="timeline-container">
     <div class="header-row" id="headerRowTop"></div>
     <div id="taskBodyTop"></div>
 </div>
@@ -79,219 +70,159 @@
 </div>
 
 <script>
-    // New Curated Palette
-    const stylishColors = [
-        '#6366f1', '#10b981', '#f59e0b', '#ef4444', 
-        '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', 
-        '#9d174d', '#64748b', '#d946ef', '#fef3c7' // Last one is Pastel Cream Yellow
-    ];
+    const stylishColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#9d174d', '#64748b', '#d946ef', '#fef3c7'];
     let selectedColor = stylishColors[0];
     let tasks = [];
     let holidays = [];
-    
     const startRange = new Date(2025, 11, 17);
     const endRange = new Date(2026, 0, 31);
     const cellW = 60;
     const labelW = 200;
 
-    const palette = document.getElementById('palette');
+    // Palette Init
+    const palEl = document.getElementById('palette');
     stylishColors.forEach(c => {
-        const div = document.createElement('div');
-        div.className = 'color-opt';
-        div.style.backgroundColor = c;
-        if(c === selectedColor) div.classList.add('active');
-        div.onclick = () => {
-            document.querySelectorAll('.color-opt').forEach(el => el.classList.remove('active'));
-            div.classList.add('active');
-            selectedColor = c;
-        };
-        palette.appendChild(div);
+        const d = document.createElement('div');
+        d.className = 'color-opt' + (c === selectedColor ? ' active' : '');
+        d.style.backgroundColor = c;
+        d.onclick = () => { document.querySelectorAll('.color-opt').forEach(e => e.classList.remove('active')); d.classList.add('active'); selectedColor = c; };
+        palEl.appendChild(d);
     });
 
     function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
-    function fromISO(s) { const parts = s.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]); }
+    function fromISO(s) { const p = s.split('-'); return new Date(p[0], p[1] - 1, p[2]); }
 
-    function loadData() {
+    function save() { localStorage.setItem('shared_tasks_v18', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v18', JSON.stringify(holidays)); }
+    function load() {
         const params = new URLSearchParams(window.location.search);
         const data = params.get('data');
-        if (data) {
-            try {
-                const decoded = JSON.parse(atob(data));
-                tasks = decoded.tasks; holidays = decoded.holidays;
-                saveLocally();
-            } catch(e) { console.error("Invalid link"); }
-        } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v17')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v17')) || [];
-        }
-    }
-
-    function saveLocally() {
-        localStorage.setItem('shared_tasks_v17', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays_v17', JSON.stringify(holidays));
+        if (data) { tasks = JSON.parse(atob(data)).tasks; holidays = JSON.parse(atob(data)).holidays; save(); }
+        else { tasks = JSON.parse(localStorage.getItem('shared_tasks_v18')) || []; holidays = JSON.parse(localStorage.getItem('shared_holidays_v18')) || []; }
     }
 
     function generateShareLink() {
-        const data = btoa(JSON.stringify({ tasks, holidays }));
-        const url = window.location.origin + window.location.pathname + "?data=" + data;
-        navigator.clipboard.writeText(url);
-        alert("Share Link Copied!");
+        const url = window.location.origin + window.location.pathname + "?data=" + btoa(JSON.stringify({ tasks, holidays }));
+        navigator.clipboard.writeText(url); alert("Link Copied!");
     }
 
-    function getOccupiedDates(t) {
-        let dates = []; let currentWork = 0; let tempDate = fromISO(t.start);
-        while (holidays.includes(toISO(tempDate))) tempDate.setDate(tempDate.getDate() + 1);
-        while (currentWork < t.dur) {
-            const dStr = toISO(tempDate);
-            if (!holidays.includes(dStr)) { dates.push(dStr); currentWork += 1; }
-            tempDate.setDate(tempDate.getDate() + 1);
-            if (tempDate > endRange) break;
+    function getOccDates(t) {
+        let dts = []; let work = 0; let d = fromISO(t.start);
+        while (holidays.includes(toISO(d))) d.setDate(d.getDate() + 1);
+        while (work < t.dur) {
+            if (!holidays.includes(toISO(d))) { dts.push(toISO(d)); work += 1; }
+            d.setDate(d.getDate() + 1);
+            if (d > endRange) break;
         }
-        return dates;
+        return dts;
     }
 
     function render() {
-        const days = [];
-        let d = new Date(startRange);
-        while(d <= endRange) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+        const days = []; let dt = new Date(startRange);
+        while(dt <= endRange) { days.push(new Date(dt)); dt.setDate(dt.getDate() + 1); }
 
-        const bodyTop = document.getElementById('taskBodyTop');
-        const bodyBottom = document.getElementById('taskBodyBottom');
+        let counts = {};
+        tasks.forEach(t => getOccDates(t).forEach(d => counts[d] = (counts[d] || 0) + 1));
 
-        let dailyCount = {};
-        tasks.forEach(t => { getOccupiedDates(t).forEach(d => dailyCount[d] = (dailyCount[d] || 0) + 1); });
-
-        const headerHTML = `<div class="cell label-cell">DATE</div>` + days.map(d => {
-            const dStr = toISO(d);
-            const isH = holidays.includes(dStr);
-            const alert = dailyCount[dStr] > 2 ? '<span class="overlap-alert">⚠️</span>' : '';
-            return `<div class="cell ${isH ? 'holiday' : ''}" onclick="toggleHoliday('${dStr}')">${alert}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}</div>`;
+        const hHTML = `<div class="cell label-cell">DATE</div>` + days.map(d => {
+            const s = toISO(d);
+            return `<div class="cell ${holidays.includes(s) ? 'holiday' : ''}" onclick="toggleHoliday('${s}')">${counts[s]>2?'⚠️':''}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US',{month:'short'})}</div>`;
         }).join('');
         
-        document.getElementById('headerRowTop').innerHTML = headerHTML;
-        document.getElementById('headerRowBottom').innerHTML = headerHTML;
+        document.getElementById('headerRowTop').innerHTML = hHTML;
+        document.getElementById('headerRowBottom').innerHTML = hHTML;
 
+        // Top Grid
+        const bodyTop = document.getElementById('taskBodyTop');
         bodyTop.innerHTML = '';
-        tasks.forEach((t, idx) => {
+        tasks.forEach((t, i) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>` + 
-                            days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
-            row.appendChild(createBar(t, true, dailyCount, idx));
+            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${i})">×</button></div>` + 
+                            days.map(d => `<div class="cell ${holidays.includes(toISO(d))?'holiday':''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
+            row.appendChild(createBar(t, true, counts));
             bodyTop.appendChild(row);
         });
 
+        // Bottom Grid
+        const bodyBottom = document.getElementById('taskBodyBottom');
         bodyBottom.innerHTML = '';
-        const summaryRows = [[], []];
-        tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
-            for(let i=0; i<2; i++) {
-                if (!isOverlap(t, summaryRows[i])) { summaryRows[i].push(t); break; }
+        const rows = [[], []];
+        tasks.slice().sort((a,b)=>fromISO(a.start)-fromISO(b.start)).forEach(t => {
+            for(let r=0; r<2; r++) {
+                const occ = getOccDates(t);
+                if (!rows[r].some(et => getOccDates(et).some(ed => occ.includes(ed)))) { rows[r].push(t); break; }
             }
         });
-        summaryRows.forEach((rowTasks, idx) => {
-            const row = document.createElement('div');
-            row.className = 'task-row';
-            row.innerHTML = `<div class="cell label-cell">${idx === 0 ? 'MAIN WORK' : 'OVERLOAD'}</div>` + days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`).join('');
-            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount)));
+        rows.forEach((rt, i) => {
+            const row = document.createElement('div'); row.className = 'task-row';
+            row.innerHTML = `<div class="cell label-cell">${i===0?'MAIN WORK':'OVERLOAD'}</div>` + days.map(d=>`<div class="cell ${holidays.includes(toISO(d))?'holiday':''}"></div>`).join('');
+            rt.forEach(t => row.appendChild(createBar(t, false, counts)));
             bodyBottom.appendChild(row);
         });
     }
 
-    function isOverlap(task, existingTasks) {
-        const newDates = getOccupiedDates(task);
-        for (let t of existingTasks) { if (newDates.some(d => getOccupiedDates(t).includes(d))) return true; }
-        return false;
-    }
-
-    function createBar(t, interactive, dailyCount, taskIdx = -1) {
+    function createBar(t, interactive, counts) {
         const group = document.createElement('div');
         group.className = 'task-group';
         group.style.setProperty('--task-color', t.color);
         
-        let visualStart = fromISO(t.start);
-        while (holidays.includes(toISO(visualStart))) visualStart.setDate(visualStart.getDate() + 1);
-        group.style.left = `${labelW + (Math.round((visualStart - startRange) / (1000*60*60*24)) * cellW)}px`;
+        let vStart = fromISO(t.start);
+        while (holidays.includes(toISO(vStart))) vStart.setDate(vStart.getDate() + 1);
+        const offset = Math.round((vStart - startRange) / 86400000);
+        group.style.left = `calc(${labelW}px + ${offset * cellW}px)`;
 
-        let currentWork = 0; let tempDate = new Date(visualStart);
-        while (currentWork < t.dur) {
-            const dStr = toISO(tempDate);
-            const isH = holidays.includes(dStr);
+        let work = 0; let d = new Date(vStart);
+        while (work < t.dur) {
+            const s = toISO(d);
+            const isH = holidays.includes(s);
             const seg = document.createElement('div');
-            let wFactor = (t.dur - currentWork < 1 && !isH) ? (t.dur - currentWork) : 1;
+            let w = (t.dur - work < 1 && !isH) ? (t.dur - work) : 1;
             
-            if (isH) {
-                seg.className = 'task-segment gap';
-                seg.style.width = `${cellW}px`;
-            } else {
-                seg.className = 'task-segment';
-                if (currentWork === 0) seg.classList.add('segment-start');
-                if (dailyCount && dailyCount[dStr] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
-                
-                if (currentWork + wFactor >= t.dur) {
-                    seg.classList.add('segment-end');
-                    seg.innerHTML += t.name;
-                    seg.style.width = `${(wFactor * cellW) - 1}px`;
+            if (isH) { seg.className = 'task-segment gap'; seg.style.width = cellW+'px'; }
+            else {
+                seg.className = 'task-segment' + (work===0?' segment-start':'');
+                if (counts && counts[s] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
+                if (work + w >= t.dur) {
+                    seg.classList.add('segment-end'); seg.innerHTML += t.name; seg.style.width = (w*cellW - 1)+'px';
                     if(interactive) {
-                        const r = document.createElement('div');
-                        r.className = 'resizer';
+                        const r = document.createElement('div'); r.className = 'resizer';
                         r.onmousedown = (e) => {
-                            e.stopPropagation();
-                            let startX = e.clientX;
-                            let startDur = t.dur;
-                            document.onmousemove = (me) => {
-                                let diff = (me.clientX - startX) / cellW;
-                                t.dur = Math.max(0.5, Math.round((startDur + diff) * 2) / 2);
-                                render();
-                            };
-                            document.onmouseup = () => { document.onmousemove = null; saveLocally(); };
+                            e.stopPropagation(); let sX = e.clientX; let sD = t.dur;
+                            document.onmousemove = (m) => { t.dur = Math.max(0.5, Math.round((sD + (m.clientX - sX)/cellW)*2)/2); render(); };
+                            document.onmouseup = () => { document.onmousemove = null; save(); render(); };
                         };
                         seg.appendChild(r);
                     }
-                } else {
-                    seg.style.width = `${cellW}px`;
-                }
-                currentWork += 1;
+                } else { seg.style.width = cellW+'px'; }
+                work += 1;
             }
             group.appendChild(seg);
-            tempDate.setDate(tempDate.getDate() + 1);
-            if (tempDate > endRange) break;
+            d.setDate(d.getDate() + 1);
+            if (d > endRange) break;
         }
 
         if (interactive) {
             group.onmousedown = (e) => {
-                let initialX = e.clientX;
-                let originalStart = fromISO(t.start);
-                document.onmousemove = (me) => {
-                    let delta = Math.round((me.clientX - initialX) / cellW);
-                    let newDate = new Date(originalStart);
-                    newDate.setDate(newDate.getDate() + delta);
-                    if (newDate >= startRange) { t.start = toISO(newDate); render(); }
+                let sX = e.clientX; let oS = fromISO(t.start);
+                document.onmousemove = (m) => {
+                    let dlt = Math.round((m.clientX - sX) / cellW);
+                    let nD = new Date(oS); nD.setDate(nD.getDate() + dlt);
+                    if (nD >= startRange) { t.start = toISO(nD); render(); }
                 };
-                document.onmouseup = () => { document.onmousemove = null; saveLocally(); };
+                document.onmouseup = () => { document.onmousemove = null; save(); render(); };
             };
         }
         return group;
     }
 
-    function toggleHoliday(dateStr) {
-        const i = holidays.indexOf(dateStr);
-        i > -1 ? holidays.splice(i, 1) : holidays.push(dateStr);
-        saveLocally(); render();
-    }
-
+    function toggleHoliday(s) { const i = holidays.indexOf(s); i > -1 ? holidays.splice(i,1) : holidays.push(s); save(); render(); }
+    function deleteTask(i) { tasks.splice(i,1); save(); render(); }
     function addTask() {
-        const name = document.getElementById('name').value;
-        const start = document.getElementById('date').value;
-        const dur = parseFloat(document.getElementById('dur').value);
-        if (name && start && !isNaN(dur)) {
-            tasks.push({ name, start, dur, color: selectedColor });
-            saveLocally(); render();
-        }
+        const n = document.getElementById('name').value, s = document.getElementById('date').value, d = parseFloat(document.getElementById('dur').value);
+        if (n && s && !isNaN(d)) { tasks.push({ name: n, start: s, dur: d, color: selectedColor }); save(); render(); }
     }
 
-    function deleteTask(idx) { tasks.splice(idx, 1); saveLocally(); render(); }
-    loadData();
-    render();
+    load(); render();
 </script>
 </body>
 </html>
