@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fixed Precision Planner</title>
+    <style>
+        :root {
+            --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
+            --border: #334155; --cell-w: 60px; --label-w: 200px;
+            --holiday-marker: #f43f5e;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
+        .controls { background: var(--card); padding: 15px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 140px; }
+        
+        .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; }
+        .header-row { display: flex; background: #1e293b; position: sticky; top: 0; z-index: 100; }
+        .task-row { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: 60px; }
+        
+        .cell { 
+            width: var(--cell-w); min-width: var(--cell-w); height: 60px; 
+            border-right: 1px solid var(--border); display: flex; align-items: center; 
+            justify-content: center; font-size: 11px; flex-shrink: 0; 
+            box-sizing: border-box; cursor: pointer; position: relative; text-align: center;
+        }
+
+        .label-cell { 
+            width: var(--label-w); min-width: var(--label-w); background: #1e293b; 
+            position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; 
+            border-right: 2px solid var(--primary); justify-content: space-between; cursor: default;
+        }
+
+        .holiday { background: rgba(244, 63, 94, 0.1) !important; }
+        .holiday::after {
+            content: ""; position: absolute; top: 0; right: 0;
+            width: 0; height: 0;
+            border-style: solid; border-width: 0 12px 12px 0;
+            border-color: transparent var(--holiday-marker) transparent transparent;
+        }
+        
+        .task-group { position: absolute; height: 34px; top: 13px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
+        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 11px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; }
+        .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; padding-left: 8px; }
+        .segment-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+        .gap { background: transparent !important; border: none; pointer-events: none; } 
+
+        button { border: none; border-radius: 6px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
+        .btn-add { background: var(--primary); color: white; }
+        .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <input type="text" id="name" placeholder="Task Name">
+    <input type="date" id="date" value="2025-12-17">
+    <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
+    <input type="color" id="color" value="#6366f1">
+    <button class="btn-add" onclick="addTask()">Add Task</button>
+    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">Click grid cells to toggle holidays</span>
+</div>
+
+<div class="timeline-container">
+    <div class="header-row" id="headerRow"></div>
+    <div id="taskBody"></div>
+</div>
+
+<script>
+    // Version 10 - Fixed Timezone Logic
+    let tasks = JSON.parse(localStorage.getItem('myTasks_v10')) || [];
+    let holidays = JSON.parse(localStorage.getItem('myHolidays_v10')) || [];
+    
+    // Create dates carefully using local time components
+    const startRange = new Date(2025, 11, 17); // Dec 17
+    const endRange = new Date(2026, 0, 31);   // Jan 31
+    const cellW = 60;
+    const labelW = 200;
+
+    function toISO(date) {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    }
+
+    function fromISO(s) {
+        const parts = s.split('-');
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+
+    function getDays() {
+        let d = new Date(startRange); let arr = [];
+        while (d <= endRange) { arr.push(new Date(d)); d.setDate(d.getDate() + 1); }
+        return arr;
+    }
+
+    function render() {
+        const days = getDays();
+        const headerRow = document.getElementById('headerRow');
+        const taskBody = document.getElementById('taskBody');
+
+        headerRow.innerHTML = `<div class="cell label-cell">TIMELINE</div>`;
+        days.forEach(d => {
+            const dateStr = toISO(d);
+            const isH = holidays.includes(dateStr);
+            const cell = document.createElement('div');
+            cell.className = `cell ${isH ? 'holiday' : ''}`;
+            cell.innerHTML = `<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}`;
+            cell.onclick = () => toggleHoliday(dateStr);
+            headerRow.appendChild(cell);
+        });
+
+        taskBody.innerHTML = '';
+        tasks.forEach((t, idx) => {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
+            
+            days.forEach(d => {
+                const dateStr = toISO(d);
+                const cell = document.createElement('div');
+                cell.className = `cell ${holidays.includes(dateStr) ? 'holiday' : ''}`;
+                cell.onclick = () => toggleHoliday(dateStr);
+                row.appendChild(cell);
+            });
+
+            const group = document.createElement('div');
+            group.className = 'task-group';
+            group.style.setProperty('--task-color', t.color);
+            
+            // VISUAL SHIFT: If task starts on a holiday, push visual bar forward
+            let visualStart = fromISO(t.start);
+            while (holidays.includes(toISO(visualStart))) {
+                visualStart.setDate(visualStart.getDate() + 1);
+            }
+
+            let dayOffset = Math.round((visualStart - startRange) / (1000*60*60*24));
+            group.style.left = `${labelW + (dayOffset * cellW)}px`;
+
+            let currentWork = 0;
+            let tempDate = new Date(visualStart);
+
+            while (currentWork < t.dur) {
+                const dStr = toISO(tempDate);
+                const isH = holidays.includes(dStr);
+                const seg = document.createElement('div');
+                let wFactor = (t.dur - currentWork < 1 && !isH) ? (t.dur - currentWork) : 1;
+
+                if (isH) {
+                    seg.className = 'task-segment gap';
+                    seg.style.width = `${cellW}px`;
+                } else {
+                    seg.className = 'task-segment';
+                    if (currentWork === 0) seg.classList.add('segment-start');
+                    if (currentWork + wFactor >= t.dur) {
+                        seg.classList.add('segment-end');
+                        seg.innerText = t.name;
+                        seg.style.width = `${(wFactor * cellW) - 1}px`;
+                    } else {
+                        seg.style.width = `${cellW}px`;
+                    }
+                    currentWork += 1;
+                }
+                group.appendChild(seg);
+                tempDate.setDate(tempDate.getDate() + 1);
+                if (tempDate > endRange) break;
+            }
+
+            group.onmousedown = (e) => {
+                let initialX = e.clientX;
+                let originalStart = fromISO(t.start);
+                document.onmousemove = (me) => {
+                    let delta = Math.round((me.clientX - initialX) / cellW);
+                    let newDate = new Date(originalStart);
+                    newDate.setDate(newDate.getDate() + delta);
+                    if (newDate >= startRange) {
+                        t.start = toISO(newDate);
+                        render();
+                    }
+                };
+                document.onmouseup = () => { document.onmousemove = null; save(); };
+            };
+
+            row.appendChild(group);
+            taskBody.appendChild(row);
+        });
+    }
+
+    function toggleHoliday(dateStr) {
+        const i = holidays.indexOf(dateStr);
+        i > -1 ? holidays.splice(i, 1) : holidays.push(dateStr);
+        save(); render();
+    }
+
+    function addTask() {
+        const name = document.getElementById('name').value;
+        const start = document.getElementById('date').value; // Returns YYYY-MM-DD
+        const dur = parseFloat(document.getElementById('dur').value);
+        if (name && start && !isNaN(dur)) {
+            tasks.push({ name, start, dur, color: document.getElementById('color').value });
+            save(); render();
+        }
+    }
+
+    function deleteTask(idx) { tasks.splice(idx, 1); save(); render(); }
+    function save() {
+        localStorage.setItem('myTasks_v10', JSON.stringify(tasks));
+        localStorage.setItem('myHolidays_v10', JSON.stringify(holidays));
+    }
+
+    render();
+</script>
+</body>
+</html>
