@@ -7,15 +7,15 @@
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
             --border: #334155; --cell-w: 60px; --label-w: 200px;
-            --holiday-marker: #fb7185;
-            --holiday-bg: #4c1d24; /* Brighter, more distinct holiday color */
+            --holiday-marker: #ff4d4d;
+            --holiday-bg: #991b1b; /* Adjusted lighter red for clarity */
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
         .controls { background: var(--card); padding: 15px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; }
         input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 140px; }
         
         .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; margin-bottom: 30px; }
-        .section-header { padding: 10px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); }
+        .section-header { padding: 10px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); letter-spacing: 1px; }
         
         .header-row { display: flex; background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: 60px; }
@@ -41,18 +41,19 @@
             border-color: transparent var(--holiday-marker) transparent transparent;
         }
 
-        .overlap-alert { position: absolute; top: 2px; left: 2px; color: #fbbf24; font-size: 14px; z-index: 20; }
+        .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 14px; z-index: 20; filter: drop-shadow(0 0 2px black); }
         
         .task-group { position: absolute; height: 34px; top: 13px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; }
+        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); }
         .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; padding-left: 8px; }
         .segment-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
 
         button { border: none; border-radius: 6px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
-        .btn-share { background: #10b981; color: white; }
+        .btn-share { background: #10b981; color: white; margin-left: auto; }
         .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
+        .delete-btn:hover { color: var(--holiday-marker); }
     </style>
 </head>
 <body>
@@ -66,13 +67,13 @@
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
-<div class="section-header">DETAILED TASK BREAKDOWN</div>
+<div class="section-header">INDIVIDUAL TASK BREAKDOWN</div>
 <div class="timeline-container">
     <div class="header-row" id="headerRowTop"></div>
     <div id="taskBodyTop"></div>
 </div>
 
-<div class="section-header">CAPACITY SUMMARY (MAX 2 PARALLEL)</div>
+<div class="section-header">CAPACITY SUMMARY</div>
 <div class="timeline-container">
     <div class="header-row" id="headerRowBottom"></div>
     <div id="taskBodyBottom"></div>
@@ -100,14 +101,14 @@
                 saveLocally();
             } catch(e) { console.error("Invalid link"); }
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v12')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v12')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v14')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v14')) || [];
         }
     }
 
     function saveLocally() {
-        localStorage.setItem('shared_tasks_v12', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays_v12', JSON.stringify(holidays));
+        localStorage.setItem('shared_tasks_v14', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays_v14', JSON.stringify(holidays));
     }
 
     function generateShareLink() {
@@ -130,7 +131,6 @@
         const headerBottom = document.getElementById('headerRowBottom');
         const bodyBottom = document.getElementById('taskBodyBottom');
 
-        // Render Headers
         const headerHTML = (isTop) => {
             let html = `<div class="cell label-cell">DATE</div>`;
             days.forEach(d => {
@@ -143,48 +143,37 @@
         headerTop.innerHTML = headerHTML(true);
         headerBottom.innerHTML = headerHTML(false);
 
-        // Track daily counts for alert
         let dailyCount = {};
 
-        // TOP GRID RENDER
         bodyTop.innerHTML = '';
         tasks.forEach((t, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
             let rowHtml = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
-            
-            days.forEach(d => {
-                const dateStr = toISO(d);
-                rowHtml += `<div class="cell ${holidays.includes(dateStr) ? 'holiday' : ''}" onclick="toggleHoliday('${dateStr}')"></div>`;
-            });
+            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`);
             row.innerHTML = rowHtml;
-
-            const barGroup = createBar(t);
-            row.appendChild(barGroup);
+            row.appendChild(createBar(t));
             bodyTop.appendChild(row);
 
-            // Calculate overlap for alert logic
-            getOccupiedDates(t).forEach(date => {
-                dailyCount[date] = (dailyCount[date] || 0) + 1;
-            });
+            getOccupiedDates(t).forEach(date => { dailyCount[date] = (dailyCount[date] || 0) + 1; });
         });
 
-        // Add Alert Icons to Header
         Array.from(headerTop.children).forEach((cell, i) => {
             if (i === 0) return;
             const dateStr = toISO(days[i-1]);
             if (dailyCount[dateStr] > 2) {
                 const alert = document.createElement('span');
                 alert.className = 'overlap-alert';
-                alert.title = "More than 2 tasks scheduled!";
+                alert.title = "Overload! More than 2 tasks scheduled.";
                 alert.innerText = '⚠️';
                 cell.appendChild(alert);
             }
         });
 
-        // BOTTOM GRID RENDER (Summary View)
+        // SUMMARY GRID (Main Work & Overload)
         bodyBottom.innerHTML = '';
-        const summaryRows = [[], []]; // Row 1 and Row 2 for summary packing
+        const summaryRows = [[], []];
+        const rowNames = ["MAIN WORK", "OVERLOAD"];
         
         tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
             let placed = false;
@@ -200,7 +189,7 @@
         summaryRows.forEach((rowTasks, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            let rowHtml = `<div class="cell label-cell">ROW ${idx + 1}</div>`;
+            let rowHtml = `<div class="cell label-cell">${rowNames[idx]}</div>`;
             days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`);
             row.innerHTML = rowHtml;
             rowTasks.forEach(t => row.appendChild(createBar(t, false)));
@@ -209,17 +198,11 @@
     }
 
     function getOccupiedDates(t) {
-        let dates = [];
-        let currentWork = 0;
-        let tempDate = fromISO(t.start);
+        let dates = []; let currentWork = 0; let tempDate = fromISO(t.start);
         while (holidays.includes(toISO(tempDate))) tempDate.setDate(tempDate.getDate() + 1);
-
         while (currentWork < t.dur) {
             const dStr = toISO(tempDate);
-            if (!holidays.includes(dStr)) {
-                dates.push(dStr);
-                currentWork += 1;
-            }
+            if (!holidays.includes(dStr)) { dates.push(dStr); currentWork += 1; }
             tempDate.setDate(tempDate.getDate() + 1);
             if (tempDate > endRange) break;
         }
@@ -245,8 +228,7 @@
         let dayOffset = Math.round((visualStart - startRange) / (1000*60*60*24));
         group.style.left = `${labelW + (dayOffset * cellW)}px`;
 
-        let currentWork = 0;
-        let tempDate = new Date(visualStart);
+        let currentWork = 0; let tempDate = new Date(visualStart);
         while (currentWork < t.dur) {
             const isH = holidays.includes(toISO(tempDate));
             const seg = document.createElement('div');
