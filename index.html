@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Conflict-Pro Planner</title>
+    <title>Conflict-Pro Planner v17</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -11,43 +11,46 @@
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
         
-        /* Controls & Color Palette */
         .controls { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 140px; }
+        
+        /* Modern Date Picker Style */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1); cursor: pointer;
+        }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 150px; }
         
         .palette { display: grid; grid-template-columns: repeat(6, 25px); gap: 5px; }
         .color-opt { width: 25px; height: 25px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
         .color-opt.active { border-color: white; transform: scale(1.1); }
 
-        /* Grids */
         .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; margin-bottom: 30px; }
         .section-header { padding: 12px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); letter-spacing: 1px; }
         .header-row { display: flex; background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: 60px; }
         
-        .cell { width: var(--cell-w); min-width: var(--cell-w); height: 60px; border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; box-sizing: border-box; cursor: pointer; position: relative; }
-        .label-cell { width: var(--label-w); min-width: var(--label-w); background: #1e293b; position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; border-right: 2px solid var(--primary); justify-content: space-between; cursor: default; }
+        .cell { width: var(--cell-w); min-width: var(--cell-w); height: 60px; border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; position: relative; }
+        .label-cell { width: var(--label-w); min-width: var(--label-w); background: #1e293b; position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; border-right: 2px solid var(--primary); justify-content: space-between; }
 
-        /* Holiday Design */
         .holiday { background: var(--holiday-bg) !important; }
         .holiday::after { content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 12px 12px 0; border-color: transparent var(--holiday-marker) transparent transparent; }
-
         .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 16px; z-index: 20; }
         
-        /* Task Bars */
-        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+        /* Task Bars with Resize handle */
+        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; }
+        .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; border: 1px solid rgba(255,255,255,0.1); position: relative; }
         .segment-start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-        .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+        .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; position: relative; }
+        
+        /* Resize Handle */
+        .resizer { position: absolute; right: 0; top: 0; width: 10px; height: 100%; cursor: ew-resize; z-index: 20; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
 
-        /* BIG ALERT ICON */
         .bar-alert { font-size: 30px; position: absolute; z-index: 5; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
 
-        button { border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button { border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
         .btn-share { background: #10b981; color: white; margin-left: auto; }
-        .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
+        .delete-btn { color: #64748b; background: none; font-size: 18px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -57,15 +60,14 @@
     <input type="date" id="date" value="2025-12-17">
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
     
-    <div class="palette" id="palette">
-        </div>
+    <div class="palette" id="palette"></div>
     
     <button class="btn-add" onclick="addTask()">Add Task</button>
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
 <div class="section-header">INDIVIDUAL TASK BREAKDOWN</div>
-<div class="timeline-container">
+<div class="timeline-container" id="containerTop">
     <div class="header-row" id="headerRowTop"></div>
     <div id="taskBodyTop"></div>
 </div>
@@ -77,10 +79,11 @@
 </div>
 
 <script>
+    // New Curated Palette
     const stylishColors = [
-        '#6366f1', '#ec4899', '#10b981', '#f59e0b', 
-        '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', 
-        '#f97316', '#64748b', '#d946ef', '#14b8a6'
+        '#6366f1', '#10b981', '#f59e0b', '#ef4444', 
+        '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', 
+        '#9d174d', '#64748b', '#d946ef', '#fef3c7' // Last one is Pastel Cream Yellow
     ];
     let selectedColor = stylishColors[0];
     let tasks = [];
@@ -91,7 +94,6 @@
     const cellW = 60;
     const labelW = 200;
 
-    // Init Palette
     const palette = document.getElementById('palette');
     stylishColors.forEach(c => {
         const div = document.createElement('div');
@@ -119,14 +121,14 @@
                 saveLocally();
             } catch(e) { console.error("Invalid link"); }
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v16')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v16')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v17')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v17')) || [];
         }
     }
 
     function saveLocally() {
-        localStorage.setItem('shared_tasks_v16', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays_v16', JSON.stringify(holidays));
+        localStorage.setItem('shared_tasks_v17', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays_v17', JSON.stringify(holidays));
     }
 
     function generateShareLink() {
@@ -169,29 +171,28 @@
         document.getElementById('headerRowTop').innerHTML = headerHTML;
         document.getElementById('headerRowBottom').innerHTML = headerHTML;
 
-        // Render Top
         bodyTop.innerHTML = '';
         tasks.forEach((t, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
             row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>` + 
                             days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
-            row.appendChild(createBar(t, true, dailyCount, days));
+            row.appendChild(createBar(t, true, dailyCount, idx));
             bodyTop.appendChild(row);
         });
 
-        // Render Bottom
         bodyBottom.innerHTML = '';
         const summaryRows = [[], []];
-        const rowNames = ["MAIN WORK", "OVERLOAD"];
         tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
-            for(let i=0; i<2; i++) { if (!isOverlap(t, summaryRows[i])) { summaryRows[i].push(t); break; } }
+            for(let i=0; i<2; i++) {
+                if (!isOverlap(t, summaryRows[i])) { summaryRows[i].push(t); break; }
+            }
         });
         summaryRows.forEach((rowTasks, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            row.innerHTML = `<div class="cell label-cell">${rowNames[idx]}</div>` + days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`).join('');
-            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount, days)));
+            row.innerHTML = `<div class="cell label-cell">${idx === 0 ? 'MAIN WORK' : 'OVERLOAD'}</div>` + days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`).join('');
+            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount)));
             bodyBottom.appendChild(row);
         });
     }
@@ -202,7 +203,7 @@
         return false;
     }
 
-    function createBar(t, draggable, dailyCount, days) {
+    function createBar(t, interactive, dailyCount, taskIdx = -1) {
         const group = document.createElement('div');
         group.className = 'task-group';
         group.style.setProperty('--task-color', t.color);
@@ -224,13 +225,28 @@
             } else {
                 seg.className = 'task-segment';
                 if (currentWork === 0) seg.classList.add('segment-start');
-                
-                if (dailyCount[dStr] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
+                if (dailyCount && dailyCount[dStr] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
                 
                 if (currentWork + wFactor >= t.dur) {
                     seg.classList.add('segment-end');
                     seg.innerHTML += t.name;
                     seg.style.width = `${(wFactor * cellW) - 1}px`;
+                    if(interactive) {
+                        const r = document.createElement('div');
+                        r.className = 'resizer';
+                        r.onmousedown = (e) => {
+                            e.stopPropagation();
+                            let startX = e.clientX;
+                            let startDur = t.dur;
+                            document.onmousemove = (me) => {
+                                let diff = (me.clientX - startX) / cellW;
+                                t.dur = Math.max(0.5, Math.round((startDur + diff) * 2) / 2);
+                                render();
+                            };
+                            document.onmouseup = () => { document.onmousemove = null; saveLocally(); };
+                        };
+                        seg.appendChild(r);
+                    }
                 } else {
                     seg.style.width = `${cellW}px`;
                 }
@@ -241,7 +257,7 @@
             if (tempDate > endRange) break;
         }
 
-        if (draggable) {
+        if (interactive) {
             group.onmousedown = (e) => {
                 let initialX = e.clientX;
                 let originalStart = fromISO(t.start);
