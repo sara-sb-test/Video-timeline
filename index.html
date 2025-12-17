@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dual-View Precision Planner</title>
+    <title>Conflict-Aware Precision Planner</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
             --border: #334155; --cell-w: 60px; --label-w: 200px;
             --holiday-marker: #ff4d4d;
-            --holiday-bg: #991b1b; /* Adjusted lighter red for clarity */
+            --holiday-bg: #991b1b; 
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
         .controls { background: var(--card); padding: 15px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; }
@@ -44,16 +44,17 @@
         .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 14px; z-index: 20; filter: drop-shadow(0 0 2px black); }
         
         .task-group { position: absolute; height: 34px; top: 13px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); }
-        .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; padding-left: 8px; }
+        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
         .segment-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
+
+        .bar-alert { font-size: 10px; margin-right: 2px; }
 
         button { border: none; border-radius: 6px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
         .btn-share { background: #10b981; color: white; margin-left: auto; }
         .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
-        .delete-btn:hover { color: var(--holiday-marker); }
     </style>
 </head>
 <body>
@@ -101,14 +102,14 @@
                 saveLocally();
             } catch(e) { console.error("Invalid link"); }
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v14')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v14')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v15')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v15')) || [];
         }
     }
 
     function saveLocally() {
-        localStorage.setItem('shared_tasks_v14', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays_v14', JSON.stringify(holidays));
+        localStorage.setItem('shared_tasks_v15', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays_v15', JSON.stringify(holidays));
     }
 
     function generateShareLink() {
@@ -124,79 +125,6 @@
         return arr;
     }
 
-    function render() {
-        const days = getDays();
-        const headerTop = document.getElementById('headerRowTop');
-        const bodyTop = document.getElementById('taskBodyTop');
-        const headerBottom = document.getElementById('headerRowBottom');
-        const bodyBottom = document.getElementById('taskBodyBottom');
-
-        const headerHTML = (isTop) => {
-            let html = `<div class="cell label-cell">DATE</div>`;
-            days.forEach(d => {
-                const dateStr = toISO(d);
-                const isH = holidays.includes(dateStr);
-                html += `<div class="cell ${isH ? 'holiday' : ''}" onclick="toggleHoliday('${dateStr}')"><strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}</div>`;
-            });
-            return html;
-        };
-        headerTop.innerHTML = headerHTML(true);
-        headerBottom.innerHTML = headerHTML(false);
-
-        let dailyCount = {};
-
-        bodyTop.innerHTML = '';
-        tasks.forEach((t, idx) => {
-            const row = document.createElement('div');
-            row.className = 'task-row';
-            let rowHtml = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
-            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`);
-            row.innerHTML = rowHtml;
-            row.appendChild(createBar(t));
-            bodyTop.appendChild(row);
-
-            getOccupiedDates(t).forEach(date => { dailyCount[date] = (dailyCount[date] || 0) + 1; });
-        });
-
-        Array.from(headerTop.children).forEach((cell, i) => {
-            if (i === 0) return;
-            const dateStr = toISO(days[i-1]);
-            if (dailyCount[dateStr] > 2) {
-                const alert = document.createElement('span');
-                alert.className = 'overlap-alert';
-                alert.title = "Overload! More than 2 tasks scheduled.";
-                alert.innerText = '⚠️';
-                cell.appendChild(alert);
-            }
-        });
-
-        // SUMMARY GRID (Main Work & Overload)
-        bodyBottom.innerHTML = '';
-        const summaryRows = [[], []];
-        const rowNames = ["MAIN WORK", "OVERLOAD"];
-        
-        tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
-            let placed = false;
-            for(let i=0; i<2; i++) {
-                if (!isOverlap(t, summaryRows[i])) {
-                    summaryRows[i].push(t);
-                    placed = true;
-                    break;
-                }
-            }
-        });
-
-        summaryRows.forEach((rowTasks, idx) => {
-            const row = document.createElement('div');
-            row.className = 'task-row';
-            let rowHtml = `<div class="cell label-cell">${rowNames[idx]}</div>`;
-            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`);
-            row.innerHTML = rowHtml;
-            rowTasks.forEach(t => row.appendChild(createBar(t, false)));
-            bodyBottom.appendChild(row);
-        });
-    }
-
     function getOccupiedDates(t) {
         let dates = []; let currentWork = 0; let tempDate = fromISO(t.start);
         while (holidays.includes(toISO(tempDate))) tempDate.setDate(tempDate.getDate() + 1);
@@ -209,28 +137,71 @@
         return dates;
     }
 
+    function render() {
+        const days = getDays();
+        const headerTop = document.getElementById('headerRowTop');
+        const bodyTop = document.getElementById('taskBodyTop');
+        const bodyBottom = document.getElementById('taskBodyBottom');
+
+        let dailyCount = {};
+        tasks.forEach(t => { getOccupiedDates(t).forEach(d => dailyCount[d] = (dailyCount[d] || 0) + 1); });
+
+        const headerHTML = `<div class="cell label-cell">DATE</div>` + days.map(d => {
+            const dStr = toISO(d);
+            const isH = holidays.includes(dStr);
+            const alert = dailyCount[dStr] > 2 ? '<span class="overlap-alert">⚠️</span>' : '';
+            return `<div class="cell ${isH ? 'holiday' : ''}" onclick="toggleHoliday('${dStr}')">${alert}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}</div>`;
+        }).join('');
+        
+        headerTop.innerHTML = headerHTML;
+        document.getElementById('headerRowBottom').innerHTML = headerHTML;
+
+        bodyTop.innerHTML = '';
+        tasks.forEach((t, idx) => {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            let rowHtml = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
+            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`);
+            row.innerHTML = rowHtml;
+            row.appendChild(createBar(t, true, dailyCount));
+            bodyTop.appendChild(row);
+        });
+
+        // Summary View
+        bodyBottom.innerHTML = '';
+        const summaryRows = [[], []];
+        const rowNames = ["MAIN WORK", "OVERLOAD"];
+        tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
+            for(let i=0; i<2; i++) { if (!isOverlap(t, summaryRows[i])) { summaryRows[i].push(t); break; } }
+        });
+        summaryRows.forEach((rowTasks, idx) => {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            row.innerHTML = `<div class="cell label-cell">${rowNames[idx]}</div>` + days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`).join('');
+            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount)));
+            bodyBottom.appendChild(row);
+        });
+    }
+
     function isOverlap(task, existingTasks) {
         const newDates = getOccupiedDates(task);
-        for (let t of existingTasks) {
-            const existingDates = getOccupiedDates(t);
-            if (newDates.some(d => existingDates.includes(d))) return true;
-        }
+        for (let t of existingTasks) { if (newDates.some(d => getOccupiedDates(t).includes(d))) return true; }
         return false;
     }
 
-    function createBar(t, draggable = true) {
+    function createBar(t, draggable, dailyCount) {
         const group = document.createElement('div');
         group.className = 'task-group';
         group.style.setProperty('--task-color', t.color);
         
         let visualStart = fromISO(t.start);
         while (holidays.includes(toISO(visualStart))) visualStart.setDate(visualStart.getDate() + 1);
-        let dayOffset = Math.round((visualStart - startRange) / (1000*60*60*24));
-        group.style.left = `${labelW + (dayOffset * cellW)}px`;
+        group.style.left = `${labelW + (Math.round((visualStart - startRange) / (1000*60*60*24)) * cellW)}px`;
 
         let currentWork = 0; let tempDate = new Date(visualStart);
         while (currentWork < t.dur) {
-            const isH = holidays.includes(toISO(tempDate));
+            const dStr = toISO(tempDate);
+            const isH = holidays.includes(dStr);
             const seg = document.createElement('div');
             let wFactor = (t.dur - currentWork < 1 && !isH) ? (t.dur - currentWork) : 1;
             
@@ -240,11 +211,17 @@
             } else {
                 seg.className = 'task-segment';
                 if (currentWork === 0) seg.classList.add('segment-start');
+                
+                // ADD ALERT ICON TO BAR IF OVER 2 TASKS
+                const hasConflict = dailyCount[dStr] > 2;
+                const icon = hasConflict ? '<span class="bar-alert">⚠️</span>' : '';
+                
                 if (currentWork + wFactor >= t.dur) {
                     seg.classList.add('segment-end');
-                    seg.innerText = t.name;
+                    seg.innerHTML = `${icon}${t.name}`;
                     seg.style.width = `${(wFactor * cellW) - 1}px`;
                 } else {
+                    seg.innerHTML = icon;
                     seg.style.width = `${cellW}px`;
                 }
                 currentWork += 1;
