@@ -2,18 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Shared Precision Planner</title>
+    <title>Dual-View Precision Planner</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
             --border: #334155; --cell-w: 60px; --label-w: 200px;
-            --holiday-marker: #f43f5e;
+            --holiday-marker: #fb7185;
+            --holiday-bg: #4c1d24; /* Brighter, more distinct holiday color */
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
         .controls { background: var(--card); padding: 15px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; }
         input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 140px; }
         
-        .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; }
+        .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; margin-bottom: 30px; }
+        .section-header { padding: 10px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); }
+        
         .header-row { display: flex; background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: 60px; }
         
@@ -30,16 +33,18 @@
             border-right: 2px solid var(--primary); justify-content: space-between; cursor: default;
         }
 
-        .holiday { background: rgba(244, 63, 94, 0.1) !important; }
+        .holiday { background: var(--holiday-bg) !important; }
         .holiday::after {
             content: ""; position: absolute; top: 0; right: 0;
             width: 0; height: 0;
             border-style: solid; border-width: 0 12px 12px 0;
             border-color: transparent var(--holiday-marker) transparent transparent;
         }
+
+        .overlap-alert { position: absolute; top: 2px; left: 2px; color: #fbbf24; font-size: 14px; z-index: 20; }
         
         .task-group { position: absolute; height: 34px; top: 13px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 11px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; }
+        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; }
         .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; padding-left: 8px; }
         .segment-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
@@ -61,31 +66,29 @@
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
+<div class="section-header">DETAILED TASK BREAKDOWN</div>
 <div class="timeline-container">
-    <div class="header-row" id="headerRow"></div>
-    <div id="taskBody"></div>
+    <div class="header-row" id="headerRowTop"></div>
+    <div id="taskBodyTop"></div>
+</div>
+
+<div class="section-header">CAPACITY SUMMARY (MAX 2 PARALLEL)</div>
+<div class="timeline-container">
+    <div class="header-row" id="headerRowBottom"></div>
+    <div id="taskBodyBottom"></div>
 </div>
 
 <script>
-    // Version 11 - URL-based Sharing System
     let tasks = [];
     let holidays = [];
-    
     const startRange = new Date(2025, 11, 17);
     const endRange = new Date(2026, 0, 31);
     const cellW = 60;
     const labelW = 200;
 
-    function toISO(date) {
-        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-    }
+    function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
+    function fromISO(s) { const parts = s.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]); }
 
-    function fromISO(s) {
-        const parts = s.split('-');
-        return new Date(parts[0], parts[1] - 1, parts[2]);
-    }
-
-    // LOAD DATA FROM URL OR LOCALSTORAGE
     function loadData() {
         const params = new URLSearchParams(window.location.search);
         const data = params.get('data');
@@ -94,19 +97,24 @@
                 const decoded = JSON.parse(atob(data));
                 tasks = decoded.tasks;
                 holidays = decoded.holidays;
-                saveLocally(); // Sync the URL data to local storage
-            } catch(e) { console.error("Invalid share link"); }
+                saveLocally();
+            } catch(e) { console.error("Invalid link"); }
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v12')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v12')) || [];
         }
+    }
+
+    function saveLocally() {
+        localStorage.setItem('shared_tasks_v12', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays_v12', JSON.stringify(holidays));
     }
 
     function generateShareLink() {
         const data = btoa(JSON.stringify({ tasks, holidays }));
         const url = window.location.origin + window.location.pathname + "?data=" + data;
         navigator.clipboard.writeText(url);
-        alert("Share Link Copied! Send this URL to your manager.");
+        alert("Share Link Copied!");
     }
 
     function getDays() {
@@ -117,75 +125,154 @@
 
     function render() {
         const days = getDays();
-        const headerRow = document.getElementById('headerRow');
-        const taskBody = document.getElementById('taskBody');
+        const headerTop = document.getElementById('headerRowTop');
+        const bodyTop = document.getElementById('taskBodyTop');
+        const headerBottom = document.getElementById('headerRowBottom');
+        const bodyBottom = document.getElementById('taskBodyBottom');
 
-        headerRow.innerHTML = `<div class="cell label-cell">TIMELINE</div>`;
-        days.forEach(d => {
-            const dateStr = toISO(d);
-            const isH = holidays.includes(dateStr);
-            const cell = document.createElement('div');
-            cell.className = `cell ${isH ? 'holiday' : ''}`;
-            cell.innerHTML = `<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}`;
-            cell.onclick = () => toggleHoliday(dateStr);
-            headerRow.appendChild(cell);
-        });
+        // Render Headers
+        const headerHTML = (isTop) => {
+            let html = `<div class="cell label-cell">DATE</div>`;
+            days.forEach(d => {
+                const dateStr = toISO(d);
+                const isH = holidays.includes(dateStr);
+                html += `<div class="cell ${isH ? 'holiday' : ''}" onclick="toggleHoliday('${dateStr}')"><strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}</div>`;
+            });
+            return html;
+        };
+        headerTop.innerHTML = headerHTML(true);
+        headerBottom.innerHTML = headerHTML(false);
 
-        taskBody.innerHTML = '';
+        // Track daily counts for alert
+        let dailyCount = {};
+
+        // TOP GRID RENDER
+        bodyTop.innerHTML = '';
         tasks.forEach((t, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
+            let rowHtml = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
             
             days.forEach(d => {
                 const dateStr = toISO(d);
-                const cell = document.createElement('div');
-                cell.className = `cell ${holidays.includes(dateStr) ? 'holiday' : ''}`;
-                cell.onclick = () => toggleHoliday(dateStr);
-                row.appendChild(cell);
+                rowHtml += `<div class="cell ${holidays.includes(dateStr) ? 'holiday' : ''}" onclick="toggleHoliday('${dateStr}')"></div>`;
             });
+            row.innerHTML = rowHtml;
 
-            const group = document.createElement('div');
-            group.className = 'task-group';
-            group.style.setProperty('--task-color', t.color);
-            
-            let visualStart = fromISO(t.start);
-            while (holidays.includes(toISO(visualStart))) {
-                visualStart.setDate(visualStart.getDate() + 1);
+            const barGroup = createBar(t);
+            row.appendChild(barGroup);
+            bodyTop.appendChild(row);
+
+            // Calculate overlap for alert logic
+            getOccupiedDates(t).forEach(date => {
+                dailyCount[date] = (dailyCount[date] || 0) + 1;
+            });
+        });
+
+        // Add Alert Icons to Header
+        Array.from(headerTop.children).forEach((cell, i) => {
+            if (i === 0) return;
+            const dateStr = toISO(days[i-1]);
+            if (dailyCount[dateStr] > 2) {
+                const alert = document.createElement('span');
+                alert.className = 'overlap-alert';
+                alert.title = "More than 2 tasks scheduled!";
+                alert.innerText = '⚠️';
+                cell.appendChild(alert);
             }
+        });
 
-            let dayOffset = Math.round((visualStart - startRange) / (1000*60*60*24));
-            group.style.left = `${labelW + (dayOffset * cellW)}px`;
-
-            let currentWork = 0;
-            let tempDate = new Date(visualStart);
-
-            while (currentWork < t.dur) {
-                const dStr = toISO(tempDate);
-                const isH = holidays.includes(dStr);
-                const seg = document.createElement('div');
-                let wFactor = (t.dur - currentWork < 1 && !isH) ? (t.dur - currentWork) : 1;
-
-                if (isH) {
-                    seg.className = 'task-segment gap';
-                    seg.style.width = `${cellW}px`;
-                } else {
-                    seg.className = 'task-segment';
-                    if (currentWork === 0) seg.classList.add('segment-start');
-                    if (currentWork + wFactor >= t.dur) {
-                        seg.classList.add('segment-end');
-                        seg.innerText = t.name;
-                        seg.style.width = `${(wFactor * cellW) - 1}px`;
-                    } else {
-                        seg.style.width = `${cellW}px`;
-                    }
-                    currentWork += 1;
+        // BOTTOM GRID RENDER (Summary View)
+        bodyBottom.innerHTML = '';
+        const summaryRows = [[], []]; // Row 1 and Row 2 for summary packing
+        
+        tasks.sort((a,b) => fromISO(a.start) - fromISO(b.start)).forEach(t => {
+            let placed = false;
+            for(let i=0; i<2; i++) {
+                if (!isOverlap(t, summaryRows[i])) {
+                    summaryRows[i].push(t);
+                    placed = true;
+                    break;
                 }
-                group.appendChild(seg);
-                tempDate.setDate(tempDate.getDate() + 1);
-                if (tempDate > endRange) break;
             }
+        });
 
+        summaryRows.forEach((rowTasks, idx) => {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            let rowHtml = `<div class="cell label-cell">ROW ${idx + 1}</div>`;
+            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`);
+            row.innerHTML = rowHtml;
+            rowTasks.forEach(t => row.appendChild(createBar(t, false)));
+            bodyBottom.appendChild(row);
+        });
+    }
+
+    function getOccupiedDates(t) {
+        let dates = [];
+        let currentWork = 0;
+        let tempDate = fromISO(t.start);
+        while (holidays.includes(toISO(tempDate))) tempDate.setDate(tempDate.getDate() + 1);
+
+        while (currentWork < t.dur) {
+            const dStr = toISO(tempDate);
+            if (!holidays.includes(dStr)) {
+                dates.push(dStr);
+                currentWork += 1;
+            }
+            tempDate.setDate(tempDate.getDate() + 1);
+            if (tempDate > endRange) break;
+        }
+        return dates;
+    }
+
+    function isOverlap(task, existingTasks) {
+        const newDates = getOccupiedDates(task);
+        for (let t of existingTasks) {
+            const existingDates = getOccupiedDates(t);
+            if (newDates.some(d => existingDates.includes(d))) return true;
+        }
+        return false;
+    }
+
+    function createBar(t, draggable = true) {
+        const group = document.createElement('div');
+        group.className = 'task-group';
+        group.style.setProperty('--task-color', t.color);
+        
+        let visualStart = fromISO(t.start);
+        while (holidays.includes(toISO(visualStart))) visualStart.setDate(visualStart.getDate() + 1);
+        let dayOffset = Math.round((visualStart - startRange) / (1000*60*60*24));
+        group.style.left = `${labelW + (dayOffset * cellW)}px`;
+
+        let currentWork = 0;
+        let tempDate = new Date(visualStart);
+        while (currentWork < t.dur) {
+            const isH = holidays.includes(toISO(tempDate));
+            const seg = document.createElement('div');
+            let wFactor = (t.dur - currentWork < 1 && !isH) ? (t.dur - currentWork) : 1;
+            
+            if (isH) {
+                seg.className = 'task-segment gap';
+                seg.style.width = `${cellW}px`;
+            } else {
+                seg.className = 'task-segment';
+                if (currentWork === 0) seg.classList.add('segment-start');
+                if (currentWork + wFactor >= t.dur) {
+                    seg.classList.add('segment-end');
+                    seg.innerText = t.name;
+                    seg.style.width = `${(wFactor * cellW) - 1}px`;
+                } else {
+                    seg.style.width = `${cellW}px`;
+                }
+                currentWork += 1;
+            }
+            group.appendChild(seg);
+            tempDate.setDate(tempDate.getDate() + 1);
+            if (tempDate > endRange) break;
+        }
+
+        if (draggable) {
             group.onmousedown = (e) => {
                 let initialX = e.clientX;
                 let originalStart = fromISO(t.start);
@@ -193,17 +280,12 @@
                     let delta = Math.round((me.clientX - initialX) / cellW);
                     let newDate = new Date(originalStart);
                     newDate.setDate(newDate.getDate() + delta);
-                    if (newDate >= startRange) {
-                        t.start = toISO(newDate);
-                        render();
-                    }
+                    if (newDate >= startRange) { t.start = toISO(newDate); render(); }
                 };
                 document.onmouseup = () => { document.onmousemove = null; saveLocally(); };
             };
-
-            row.appendChild(group);
-            taskBody.appendChild(row);
-        });
+        }
+        return group;
     }
 
     function toggleHoliday(dateStr) {
@@ -223,12 +305,6 @@
     }
 
     function deleteTask(idx) { tasks.splice(idx, 1); saveLocally(); render(); }
-    
-    function saveLocally() {
-        localStorage.setItem('shared_tasks', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays', JSON.stringify(holidays));
-    }
-
     loadData();
     render();
 </script>
