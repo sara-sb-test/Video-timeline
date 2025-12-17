@@ -2,56 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Conflict-Aware Precision Planner</title>
+    <title>Conflict-Pro Planner</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
             --border: #334155; --cell-w: 60px; --label-w: 200px;
-            --holiday-marker: #ff4d4d;
-            --holiday-bg: #991b1b; 
+            --holiday-marker: #ff4d4d; --holiday-bg: #991b1b; 
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
-        .controls { background: var(--card); padding: 15px; border-radius: 12px; display: flex; gap: 10px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; }
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 6px; width: 140px; }
         
+        /* Controls & Color Palette */
+        .controls { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 140px; }
+        
+        .palette { display: grid; grid-template-columns: repeat(6, 25px); gap: 5px; }
+        .color-opt { width: 25px; height: 25px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-opt.active { border-color: white; transform: scale(1.1); }
+
+        /* Grids */
         .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; margin-bottom: 30px; }
-        .section-header { padding: 10px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); letter-spacing: 1px; }
-        
+        .section-header { padding: 12px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); letter-spacing: 1px; }
         .header-row { display: flex; background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: 60px; }
         
-        .cell { 
-            width: var(--cell-w); min-width: var(--cell-w); height: 60px; 
-            border-right: 1px solid var(--border); display: flex; align-items: center; 
-            justify-content: center; font-size: 11px; flex-shrink: 0; 
-            box-sizing: border-box; cursor: pointer; position: relative; text-align: center;
-        }
+        .cell { width: var(--cell-w); min-width: var(--cell-w); height: 60px; border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; box-sizing: border-box; cursor: pointer; position: relative; }
+        .label-cell { width: var(--label-w); min-width: var(--label-w); background: #1e293b; position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; border-right: 2px solid var(--primary); justify-content: space-between; cursor: default; }
 
-        .label-cell { 
-            width: var(--label-w); min-width: var(--label-w); background: #1e293b; 
-            position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; 
-            border-right: 2px solid var(--primary); justify-content: space-between; cursor: default;
-        }
-
+        /* Holiday Design */
         .holiday { background: var(--holiday-bg) !important; }
-        .holiday::after {
-            content: ""; position: absolute; top: 0; right: 0;
-            width: 0; height: 0;
-            border-style: solid; border-width: 0 12px 12px 0;
-            border-color: transparent var(--holiday-marker) transparent transparent;
-        }
+        .holiday::after { content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 12px 12px 0; border-color: transparent var(--holiday-marker) transparent transparent; }
 
-        .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 14px; z-index: 20; filter: drop-shadow(0 0 2px black); }
+        .overlap-alert { position: absolute; top: 4px; left: 4px; color: #fbbf24; font-size: 16px; z-index: 20; }
         
-        .task-group { position: absolute; height: 34px; top: 13px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 34px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); position: relative; }
-        .segment-start { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
-        .segment-end { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+        /* Task Bars */
+        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
+        .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; pointer-events: auto; cursor: grab; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .segment-start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+        .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
         .gap { background: transparent !important; border: none; pointer-events: none; } 
 
-        .bar-alert { font-size: 10px; margin-right: 2px; }
+        /* BIG ALERT ICON */
+        .bar-alert { font-size: 30px; position: absolute; z-index: 5; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
 
-        button { border: none; border-radius: 6px; padding: 8px 15px; cursor: pointer; font-weight: bold; }
+        button { border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-add { background: var(--primary); color: white; }
         .btn-share { background: #10b981; color: white; margin-left: auto; }
         .delete-btn { color: #64748b; background: none; font-size: 18px; padding: 0; cursor: pointer; }
@@ -63,7 +56,10 @@
     <input type="text" id="name" placeholder="Task Name">
     <input type="date" id="date" value="2025-12-17">
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
-    <input type="color" id="color" value="#6366f1">
+    
+    <div class="palette" id="palette">
+        </div>
+    
     <button class="btn-add" onclick="addTask()">Add Task</button>
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
@@ -81,12 +77,34 @@
 </div>
 
 <script>
+    const stylishColors = [
+        '#6366f1', '#ec4899', '#10b981', '#f59e0b', 
+        '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', 
+        '#f97316', '#64748b', '#d946ef', '#14b8a6'
+    ];
+    let selectedColor = stylishColors[0];
     let tasks = [];
     let holidays = [];
+    
     const startRange = new Date(2025, 11, 17);
     const endRange = new Date(2026, 0, 31);
     const cellW = 60;
     const labelW = 200;
+
+    // Init Palette
+    const palette = document.getElementById('palette');
+    stylishColors.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'color-opt';
+        div.style.backgroundColor = c;
+        if(c === selectedColor) div.classList.add('active');
+        div.onclick = () => {
+            document.querySelectorAll('.color-opt').forEach(el => el.classList.remove('active'));
+            div.classList.add('active');
+            selectedColor = c;
+        };
+        palette.appendChild(div);
+    });
 
     function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
     function fromISO(s) { const parts = s.split('-'); return new Date(parts[0], parts[1] - 1, parts[2]); }
@@ -97,19 +115,18 @@
         if (data) {
             try {
                 const decoded = JSON.parse(atob(data));
-                tasks = decoded.tasks;
-                holidays = decoded.holidays;
+                tasks = decoded.tasks; holidays = decoded.holidays;
                 saveLocally();
             } catch(e) { console.error("Invalid link"); }
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v15')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v15')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v16')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v16')) || [];
         }
     }
 
     function saveLocally() {
-        localStorage.setItem('shared_tasks_v15', JSON.stringify(tasks));
-        localStorage.setItem('shared_holidays_v15', JSON.stringify(holidays));
+        localStorage.setItem('shared_tasks_v16', JSON.stringify(tasks));
+        localStorage.setItem('shared_holidays_v16', JSON.stringify(holidays));
     }
 
     function generateShareLink() {
@@ -117,12 +134,6 @@
         const url = window.location.origin + window.location.pathname + "?data=" + data;
         navigator.clipboard.writeText(url);
         alert("Share Link Copied!");
-    }
-
-    function getDays() {
-        let d = new Date(startRange); let arr = [];
-        while (d <= endRange) { arr.push(new Date(d)); d.setDate(d.getDate() + 1); }
-        return arr;
     }
 
     function getOccupiedDates(t) {
@@ -138,8 +149,10 @@
     }
 
     function render() {
-        const days = getDays();
-        const headerTop = document.getElementById('headerRowTop');
+        const days = [];
+        let d = new Date(startRange);
+        while(d <= endRange) { days.push(new Date(d)); d.setDate(d.getDate() + 1); }
+
         const bodyTop = document.getElementById('taskBodyTop');
         const bodyBottom = document.getElementById('taskBodyBottom');
 
@@ -153,21 +166,21 @@
             return `<div class="cell ${isH ? 'holiday' : ''}" onclick="toggleHoliday('${dStr}')">${alert}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US', {month:'short'})}</div>`;
         }).join('');
         
-        headerTop.innerHTML = headerHTML;
+        document.getElementById('headerRowTop').innerHTML = headerHTML;
         document.getElementById('headerRowBottom').innerHTML = headerHTML;
 
+        // Render Top
         bodyTop.innerHTML = '';
         tasks.forEach((t, idx) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            let rowHtml = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>`;
-            days.forEach(d => rowHtml += `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`);
-            row.innerHTML = rowHtml;
-            row.appendChild(createBar(t, true, dailyCount));
+            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${idx})">×</button></div>` + 
+                            days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
+            row.appendChild(createBar(t, true, dailyCount, days));
             bodyTop.appendChild(row);
         });
 
-        // Summary View
+        // Render Bottom
         bodyBottom.innerHTML = '';
         const summaryRows = [[], []];
         const rowNames = ["MAIN WORK", "OVERLOAD"];
@@ -178,7 +191,7 @@
             const row = document.createElement('div');
             row.className = 'task-row';
             row.innerHTML = `<div class="cell label-cell">${rowNames[idx]}</div>` + days.map(d => `<div class="cell ${holidays.includes(toISO(d)) ? 'holiday' : ''}"></div>`).join('');
-            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount)));
+            rowTasks.forEach(t => row.appendChild(createBar(t, false, dailyCount, days)));
             bodyBottom.appendChild(row);
         });
     }
@@ -189,7 +202,7 @@
         return false;
     }
 
-    function createBar(t, draggable, dailyCount) {
+    function createBar(t, draggable, dailyCount, days) {
         const group = document.createElement('div');
         group.className = 'task-group';
         group.style.setProperty('--task-color', t.color);
@@ -212,16 +225,13 @@
                 seg.className = 'task-segment';
                 if (currentWork === 0) seg.classList.add('segment-start');
                 
-                // ADD ALERT ICON TO BAR IF OVER 2 TASKS
-                const hasConflict = dailyCount[dStr] > 2;
-                const icon = hasConflict ? '<span class="bar-alert">⚠️</span>' : '';
+                if (dailyCount[dStr] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
                 
                 if (currentWork + wFactor >= t.dur) {
                     seg.classList.add('segment-end');
-                    seg.innerHTML = `${icon}${t.name}`;
+                    seg.innerHTML += t.name;
                     seg.style.width = `${(wFactor * cellW) - 1}px`;
                 } else {
-                    seg.innerHTML = icon;
                     seg.style.width = `${cellW}px`;
                 }
                 currentWork += 1;
@@ -258,7 +268,7 @@
         const start = document.getElementById('date').value;
         const dur = parseFloat(document.getElementById('dur').value);
         if (name && start && !isNaN(dur)) {
-            tasks.push({ name, start, dur, color: document.getElementById('color').value });
+            tasks.push({ name, start, dur, color: selectedColor });
             saveLocally(); render();
         }
     }
