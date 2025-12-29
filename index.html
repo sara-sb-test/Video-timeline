@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Precision Sync Planner v20</title>
+    <title>Precision Sync Planner v23</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -13,8 +13,12 @@
         
         .controls { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 150px; }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 140px; }
         
+        .nav-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; background: #0f172a; padding: 5px 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .nav-btn { background: var(--primary); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .nav-btn.today { background: #10b981; }
+
         .palette { display: grid; grid-template-columns: repeat(6, 25px); gap: 5px; }
         .color-opt { width: 25px; height: 25px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
         .color-opt.active { border-color: white; transform: scale(1.1); }
@@ -26,30 +30,24 @@
         .header-row { background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { position: relative; border-bottom: 1px solid var(--border); min-height: 60px; z-index: 1; }
         
-        /* The cell where you click for holidays */
         .cell { 
             width: var(--cell-w); min-width: var(--cell-w); height: 60px; 
             border-right: 1px solid var(--border); display: flex; align-items: center; 
             justify-content: center; font-size: 11px; flex-shrink: 0; box-sizing: border-box;
-            cursor: pointer; z-index: 2;
+            position: relative; pointer-events: none; /* Clicks handled by row/header listener */
         }
-        .cell:hover { background: rgba(255,255,255,0.05); }
 
         .label-cell { 
             width: var(--label-w); min-width: var(--label-w); background: #1e293b; 
             position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; 
             border-right: 2px solid var(--primary); justify-content: space-between; flex-shrink: 0;
-            cursor: default;
+            pointer-events: auto; /* Buttons inside need to work */
         }
 
-        .holiday { background: var(--holiday-bg) !important; position: relative; }
+        .holiday { background: var(--holiday-bg) !important; }
         .holiday::after { content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 12px 12px 0; border-color: transparent var(--holiday-marker) transparent transparent; }
         
-        /* Bars need to be above cells but allow clicks through to cells if needed */
-        .task-group { 
-            position: absolute; height: 38px; top: 11px; z-index: 10; 
-            display: flex; align-items: center; pointer-events: none; 
-        }
+        .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
         .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; border-left: 0.5px solid rgba(255,255,255,0.1); position: relative; pointer-events: auto; }
         .segment-start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; border-left: none; }
         .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
@@ -60,8 +58,8 @@
 
         button { border: none; border-radius: 6px; padding: 10px 18px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--primary); color: white; }
-        .btn-share { background: #10b981; color: white; margin-left: auto; }
-        .delete-btn { color: #64748b; background: none; font-size: 18px; cursor: pointer; border: none; z-index: 60; }
+        .btn-share { background: #10b981; color: white; }
+        .delete-btn { color: #64748b; background: none; font-size: 18px; cursor: pointer; border: none; }
     </style>
 </head>
 <body>
@@ -72,17 +70,25 @@
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
     <div class="palette" id="palette"></div>
     <button class="btn-add" onclick="addTask()">Add Task</button>
+    
+    <div class="nav-controls">
+        <button class="nav-btn today" onclick="jumpToToday()">Today</button>
+        <button class="nav-btn" onclick="moveGrid(-7)">‹</button>
+        <input type="date" id="gridFocus" onchange="updateGridFocus()">
+        <button class="nav-btn" onclick="moveGrid(7)">›</button>
+    </div>
+
     <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
 <div class="section-header">INDIVIDUAL TASK BREAKDOWN</div>
-<div class="timeline-container">
+<div class="timeline-container" onclick="handleGridClick(event)">
     <div class="header-row" id="headerRowTop"></div>
     <div id="taskBodyTop"></div>
 </div>
 
 <div class="section-header">CAPACITY SUMMARY</div>
-<div class="timeline-container">
+<div class="timeline-container" onclick="handleGridClick(event)">
     <div class="header-row" id="headerRowBottom"></div>
     <div id="taskBodyBottom"></div>
 </div>
@@ -92,8 +98,12 @@
     let selectedColor = stylishColors[0];
     let tasks = [];
     let holidays = [];
-    const startRange = new Date(2025, 11, 17);
-    const endRange = new Date(2026, 0, 31);
+    
+    const minLimit = new Date(2025, 0, 1);
+    const maxLimit = new Date(2026, 11, 31);
+    let gridStartDate = new Date(2025, 11, 29); // Start at today
+    const visibleDaysCount = 31; 
+    
     const cellW = 60;
     const labelW = 200;
 
@@ -110,17 +120,54 @@
     function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
     function fromISO(s) { const p = s.split('-'); return new Date(p[0], p[1] - 1, p[2]); }
 
-    function save() { localStorage.setItem('shared_tasks_v20', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v20', JSON.stringify(holidays)); }
+    function save() { localStorage.setItem('shared_tasks_v23', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v23', JSON.stringify(holidays)); }
     function load() {
         const params = new URLSearchParams(window.location.search);
         const data = params.get('data');
-        if (data) { tasks = JSON.parse(atob(data)).tasks; holidays = JSON.parse(atob(data)).holidays; save(); }
-        else { tasks = JSON.parse(localStorage.getItem('shared_tasks_v20')) || []; holidays = JSON.parse(localStorage.getItem('shared_holidays_v20')) || []; }
+        if (data) { 
+            const decoded = JSON.parse(atob(data));
+            tasks = decoded.tasks; holidays = decoded.holidays; save(); 
+        } else {
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v23')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v23')) || [];
+        }
+    }
+
+    // THE MASTER CLICK HANDLER
+    function handleGridClick(e) {
+        // Find click position relative to the grid container
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+        
+        // If click is within the date grid area (past the label column)
+        if (x > labelW) {
+            const dayIndex = Math.floor((x - labelW) / cellW);
+            const clickedDate = new Date(gridStartDate);
+            clickedDate.setDate(clickedDate.getDate() + dayIndex);
+            toggleHoliday(toISO(clickedDate));
+        }
     }
 
     function generateShareLink() {
         const url = window.location.origin + window.location.pathname + "?data=" + btoa(JSON.stringify({ tasks, holidays }));
         navigator.clipboard.writeText(url); alert("Link Copied!");
+    }
+
+    function jumpToToday() {
+        gridStartDate = new Date();
+        document.getElementById('gridFocus').value = toISO(gridStartDate);
+        render();
+    }
+
+    function moveGrid(days) {
+        gridStartDate.setDate(gridStartDate.getDate() + days);
+        document.getElementById('gridFocus').value = toISO(gridStartDate);
+        render();
+    }
+
+    function updateGridFocus() {
+        gridStartDate = fromISO(document.getElementById('gridFocus').value);
+        render();
     }
 
     function getOccDates(t) {
@@ -129,21 +176,24 @@
         while (work < t.dur) {
             if (!holidays.includes(toISO(d))) { dts.push(toISO(d)); work += 1; }
             d.setDate(d.getDate() + 1);
-            if (d > endRange) break;
+            if (d > maxLimit) break;
         }
         return dts;
     }
 
     function render() {
-        const days = []; let dt = new Date(startRange);
-        while(dt <= endRange) { days.push(new Date(dt)); dt.setDate(dt.getDate() + 1); }
+        const days = []; let dt = new Date(gridStartDate);
+        for(let i=0; i < visibleDaysCount; i++) {
+            days.push(new Date(dt));
+            dt.setDate(dt.getDate() + 1);
+        }
 
         let counts = {};
         tasks.forEach(t => getOccDates(t).forEach(d => counts[d] = (counts[d] || 0) + 1));
 
         const hHTML = `<div class="cell label-cell">DATE</div>` + days.map(d => {
             const s = toISO(d);
-            return `<div class="cell ${holidays.includes(s) ? 'holiday' : ''}" onclick="toggleHoliday('${s}')">${counts[s]>2?'⚠️':''}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US',{month:'short'})}</div>`;
+            return `<div class="cell ${holidays.includes(s) ? 'holiday' : ''}"> ${counts[s]>2?'⚠️':''}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US',{month:'short'})}</div>`;
         }).join('');
         
         document.getElementById('headerRowTop').innerHTML = hHTML;
@@ -154,8 +204,8 @@
         tasks.forEach((t, i) => {
             const row = document.createElement('div');
             row.className = 'task-row';
-            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(${i})">×</button></div>` + 
-                            days.map(d => `<div class="cell ${holidays.includes(toISO(d))?'holiday':''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
+            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(event, ${i})">×</button></div>` + 
+                            days.map(d => `<div class="cell ${holidays.includes(toISO(d))?'holiday':''}"></div>`).join('');
             row.appendChild(createBar(t, true, counts));
             bodyTop.appendChild(row);
         });
@@ -184,7 +234,8 @@
         
         let vStart = fromISO(t.start);
         while (holidays.includes(toISO(vStart))) vStart.setDate(vStart.getDate() + 1);
-        const dayDiff = Math.round((vStart - startRange) / (1000 * 60 * 60 * 24));
+        
+        const dayDiff = Math.round((vStart - gridStartDate) / (1000 * 60 * 60 * 24));
         group.style.left = `${labelW + (dayDiff * cellW)}px`;
 
         let work = 0; let d = new Date(vStart);
@@ -194,43 +245,46 @@
             const seg = document.createElement('div');
             let w = (t.dur - work < 1 && !isH) ? (t.dur - work) : 1;
             
-            if (isH) { 
-                seg.className = 'task-segment gap'; 
-                seg.style.width = cellW + 'px'; 
-            } else {
-                seg.className = 'task-segment' + (work === 0 ? ' segment-start' : '');
-                if (counts && counts[s] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
-                if (work + w >= t.dur) {
-                    seg.classList.add('segment-end');
-                    seg.innerHTML += `<span style="padding:0 5px">${t.name}</span>`;
-                    seg.style.width = (w * cellW) + 'px';
-                    if(interactive) {
-                        const r = document.createElement('div'); r.className = 'resizer';
-                        r.onmousedown = (e) => {
-                            e.stopPropagation(); let sX = e.clientX; let sD = t.dur;
-                            document.onmousemove = (m) => { t.dur = Math.max(0.5, Math.round((sD + (m.clientX - sX)/cellW)*2)/2); render(); };
-                            document.onmouseup = () => { document.onmousemove = null; save(); render(); };
-                        };
-                        seg.appendChild(r);
-                    }
-                } else { 
+            const dIdx = Math.round((d - gridStartDate) / (1000 * 60 * 60 * 24));
+            
+            if (dIdx >= 0 && dIdx < visibleDaysCount) {
+                if (isH) { 
+                    seg.className = 'task-segment gap'; 
                     seg.style.width = cellW + 'px'; 
+                } else {
+                    seg.className = 'task-segment' + (work === 0 ? ' segment-start' : '');
+                    if (counts && counts[s] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
+                    if (work + w >= t.dur) {
+                        seg.classList.add('segment-end');
+                        seg.innerHTML += `<span style="padding:0 5px">${t.name}</span>`;
+                        seg.style.width = (w * cellW) + 'px';
+                        if(interactive) {
+                            const r = document.createElement('div'); r.className = 'resizer';
+                            r.onmousedown = (e) => {
+                                e.stopPropagation(); let sX = e.clientX; let sD = t.dur;
+                                document.onmousemove = (m) => { t.dur = Math.max(0.5, Math.round((sD + (m.clientX - sX)/cellW)*2)/2); render(); };
+                                document.onmouseup = () => { document.onmousemove = null; save(); render(); };
+                            };
+                            seg.appendChild(r);
+                        }
+                    } else { seg.style.width = cellW + 'px'; }
                 }
-                work += 1;
+                group.appendChild(seg);
             }
-            group.appendChild(seg);
+            if (!isH) work += 1;
             d.setDate(d.getDate() + 1);
-            if (d > endRange) break;
+            if (d > maxLimit) break;
         }
 
         if (interactive) {
             group.onmousedown = (e) => {
                 if (e.target.className.includes('resizer')) return;
+                e.stopPropagation(); // Stop grid click from firing when dragging a bar
                 let sX = e.clientX; let oS = fromISO(t.start);
                 document.onmousemove = (m) => {
                     let dlt = Math.round((m.clientX - sX) / cellW);
                     let nD = new Date(oS); nD.setDate(nD.getDate() + dlt);
-                    if (nD >= startRange) { t.start = toISO(nD); render(); }
+                    if (nD >= minLimit) { t.start = toISO(nD); render(); }
                 };
                 document.onmouseup = () => { document.onmousemove = null; save(); render(); };
             };
@@ -242,17 +296,20 @@
         const i = holidays.indexOf(s);
         if (i > -1) holidays.splice(i, 1);
         else holidays.push(s);
-        save();
-        render();
+        save(); render();
     }
 
-    function deleteTask(i) { tasks.splice(i, 1); save(); render(); }
+    function deleteTask(e, i) { 
+        e.stopPropagation(); // Stop grid click from firing
+        tasks.splice(i, 1); save(); render(); 
+    }
+    
     function addTask() {
         const n = document.getElementById('name').value, s = document.getElementById('date').value, d = parseFloat(document.getElementById('dur').value);
         if (n && s && !isNaN(d)) { tasks.push({ name: n, start: s, dur: d, color: selectedColor }); save(); render(); }
     }
 
-    load(); render();
+    load(); jumpToToday();
 </script>
 </body>
 </html>
