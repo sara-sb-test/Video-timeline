@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Precision Sync Planner v23</title>
+    <title>Precision Sync Planner v24</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -34,14 +34,14 @@
             width: var(--cell-w); min-width: var(--cell-w); height: 60px; 
             border-right: 1px solid var(--border); display: flex; align-items: center; 
             justify-content: center; font-size: 11px; flex-shrink: 0; box-sizing: border-box;
-            position: relative; pointer-events: none; /* Clicks handled by row/header listener */
+            position: relative; pointer-events: none; 
         }
 
         .label-cell { 
             width: var(--label-w); min-width: var(--label-w); background: #1e293b; 
             position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; 
             border-right: 2px solid var(--primary); justify-content: space-between; flex-shrink: 0;
-            pointer-events: auto; /* Buttons inside need to work */
+            pointer-events: auto;
         }
 
         .holiday { background: var(--holiday-bg) !important; }
@@ -66,7 +66,7 @@
 
 <div class="controls">
     <input type="text" id="name" placeholder="Task Name">
-    <input type="date" id="date" value="2025-12-17">
+    <input type="date" id="date" value="2025-12-29">
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
     <div class="palette" id="palette"></div>
     <button class="btn-add" onclick="addTask()">Add Task</button>
@@ -101,7 +101,7 @@
     
     const minLimit = new Date(2025, 0, 1);
     const maxLimit = new Date(2026, 11, 31);
-    let gridStartDate = new Date(2025, 11, 29); // Start at today
+    let gridStartDate = new Date(2025, 11, 29); 
     const visibleDaysCount = 31; 
     
     const cellW = 60;
@@ -117,10 +117,17 @@
         palEl.appendChild(d);
     });
 
+    // ABSOLUTE DATE HELPER: Prevents timezone drift
+    function getDaysDiff(d1, d2) {
+        const date1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+        const date2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+        return Math.round((date1 - date2) / (1000 * 60 * 60 * 24));
+    }
+
     function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
     function fromISO(s) { const p = s.split('-'); return new Date(p[0], p[1] - 1, p[2]); }
 
-    function save() { localStorage.setItem('shared_tasks_v23', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v23', JSON.stringify(holidays)); }
+    function save() { localStorage.setItem('shared_tasks_v24', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v24', JSON.stringify(holidays)); }
     function load() {
         const params = new URLSearchParams(window.location.search);
         const data = params.get('data');
@@ -128,22 +135,18 @@
             const decoded = JSON.parse(atob(data));
             tasks = decoded.tasks; holidays = decoded.holidays; save(); 
         } else {
-            tasks = JSON.parse(localStorage.getItem('shared_tasks_v23')) || [];
-            holidays = JSON.parse(localStorage.getItem('shared_holidays_v23')) || [];
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v24')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v24')) || [];
         }
     }
 
-    // THE MASTER CLICK HANDLER
     function handleGridClick(e) {
-        // Find click position relative to the grid container
+        if (e.target.closest('.label-cell') || e.target.closest('.task-segment')) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
-        
-        // If click is within the date grid area (past the label column)
         if (x > labelW) {
             const dayIndex = Math.floor((x - labelW) / cellW);
-            const clickedDate = new Date(gridStartDate);
-            clickedDate.setDate(clickedDate.getDate() + dayIndex);
+            const clickedDate = new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate() + dayIndex);
             toggleHoliday(toISO(clickedDate));
         }
     }
@@ -182,10 +185,9 @@
     }
 
     function render() {
-        const days = []; let dt = new Date(gridStartDate);
+        const days = []; 
         for(let i=0; i < visibleDaysCount; i++) {
-            days.push(new Date(dt));
-            dt.setDate(dt.getDate() + 1);
+            days.push(new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate() + i));
         }
 
         let counts = {};
@@ -213,7 +215,8 @@
         const bodyBottom = document.getElementById('taskBodyBottom');
         bodyBottom.innerHTML = '';
         const rows = [[], []];
-        tasks.slice().sort((a,b)=>fromISO(a.start)-fromISO(b.start)).forEach(t => {
+        const sortedTasks = [...tasks].sort((a,b)=>fromISO(a.start)-fromISO(b.start));
+        sortedTasks.forEach(t => {
             for(let r=0; r<2; r++) {
                 const occ = getOccDates(t);
                 if (!rows[r].some(et => getOccDates(et).some(ed => occ.includes(ed)))) { rows[r].push(t); break; }
@@ -235,17 +238,17 @@
         let vStart = fromISO(t.start);
         while (holidays.includes(toISO(vStart))) vStart.setDate(vStart.getDate() + 1);
         
-        const dayDiff = Math.round((vStart - gridStartDate) / (1000 * 60 * 60 * 24));
+        const dayDiff = getDaysDiff(vStart, gridStartDate);
         group.style.left = `${labelW + (dayDiff * cellW)}px`;
 
-        let work = 0; let d = new Date(vStart);
+        let work = 0; let d = new Date(vStart.getFullYear(), vStart.getMonth(), vStart.getDate());
         while (work < t.dur) {
             const s = toISO(d);
             const isH = holidays.includes(s);
             const seg = document.createElement('div');
             let w = (t.dur - work < 1 && !isH) ? (t.dur - work) : 1;
             
-            const dIdx = Math.round((d - gridStartDate) / (1000 * 60 * 60 * 24));
+            const dIdx = getDaysDiff(d, gridStartDate);
             
             if (dIdx >= 0 && dIdx < visibleDaysCount) {
                 if (isH) { 
@@ -279,11 +282,11 @@
         if (interactive) {
             group.onmousedown = (e) => {
                 if (e.target.className.includes('resizer')) return;
-                e.stopPropagation(); // Stop grid click from firing when dragging a bar
+                e.stopPropagation();
                 let sX = e.clientX; let oS = fromISO(t.start);
                 document.onmousemove = (m) => {
                     let dlt = Math.round((m.clientX - sX) / cellW);
-                    let nD = new Date(oS); nD.setDate(nD.getDate() + dlt);
+                    let nD = new Date(oS.getFullYear(), oS.getMonth(), oS.getDate() + dlt);
                     if (nD >= minLimit) { t.start = toISO(nD); render(); }
                 };
                 document.onmouseup = () => { document.onmousemove = null; save(); render(); };
@@ -300,7 +303,7 @@
     }
 
     function deleteTask(e, i) { 
-        e.stopPropagation(); // Stop grid click from firing
+        e.stopPropagation();
         tasks.splice(i, 1); save(); render(); 
     }
     
@@ -309,7 +312,7 @@
         if (n && s && !isNaN(d)) { tasks.push({ name: n, start: s, dur: d, color: selectedColor }); save(); render(); }
     }
 
-    load(); jumpToToday();
+    load(); render();
 </script>
 </body>
 </html>
