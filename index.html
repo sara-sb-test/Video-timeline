@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Precision Sync Planner v26</title>
+    <title>Precision Sync Planner v24</title>
     <style>
         :root {
             --primary: #6366f1; --bg: #0f172a; --card: #1e293b;
@@ -11,46 +11,44 @@
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #f1f5f9; padding: 20px; margin: 0; }
         
-        /* Controls */
         .controls { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; border: 1px solid var(--border); align-items: center; flex-wrap: wrap; }
-        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 140px; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        input { background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 140px; }
         
         .nav-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; background: #0f172a; padding: 5px 15px; border-radius: 8px; border: 1px solid var(--border); }
-        .nav-btn { background: var(--primary); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .nav-btn { background: var(--primary); color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
         .nav-btn.today { background: #10b981; }
 
         .palette { display: grid; grid-template-columns: repeat(6, 25px); gap: 5px; }
         .color-opt { width: 25px; height: 25px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
         .color-opt.active { border-color: white; transform: scale(1.1); }
 
-        /* Grid Structure */
         .timeline-container { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--card); position: relative; margin-bottom: 30px; }
         .section-header { padding: 12px 20px; background: #0f172a; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); color: var(--primary); letter-spacing: 1px; }
         
-        .header-row, .task-row { display: flex; width: max-content; min-width: 100%; }
-        .header-row { background: #1e293b; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+        .header-row, .task-row { display: flex; width: max-content; }
+        .header-row { background: #1e293b; position: sticky; top: 0; z-index: 100; }
         .task-row { position: relative; border-bottom: 1px solid var(--border); min-height: 60px; z-index: 1; }
         
         .cell { 
             width: var(--cell-w); min-width: var(--cell-w); height: 60px; 
-            border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; 
+            border-right: 1px solid var(--border); display: flex; align-items: center; 
             justify-content: center; font-size: 11px; flex-shrink: 0; box-sizing: border-box;
-            cursor: pointer;
+            position: relative; pointer-events: none; 
         }
 
         .label-cell { 
             width: var(--label-w); min-width: var(--label-w); background: #1e293b; 
             position: sticky; left: 0; z-index: 50; padding: 0 15px; font-weight: bold; 
-            border-right: 2px solid var(--primary); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+            border-right: 2px solid var(--primary); justify-content: space-between; flex-shrink: 0;
+            pointer-events: auto;
         }
 
-        .holiday { background: var(--holiday-bg) !important; position: relative; }
+        .holiday { background: var(--holiday-bg) !important; }
         .holiday::after { content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 12px 12px 0; border-color: transparent var(--holiday-marker) transparent transparent; }
         
-        /* Bars */
         .task-group { position: absolute; height: 38px; top: 11px; z-index: 10; display: flex; align-items: center; pointer-events: none; }
-        .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.1); position: relative; pointer-events: auto; }
+        .task-segment { height: 38px; background: var(--task-color); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: white; overflow: hidden; white-space: nowrap; box-sizing: border-box; border-left: 0.5px solid rgba(255,255,255,0.1); position: relative; pointer-events: auto; }
         .segment-start { border-top-left-radius: 8px; border-bottom-left-radius: 8px; border-left: none; }
         .segment-end { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
         
@@ -72,33 +70,42 @@
     <input type="number" id="dur" placeholder="Days" step="0.5" value="1">
     <div class="palette" id="palette"></div>
     <button class="btn-add" onclick="addTask()">Add Task</button>
+    
     <div class="nav-controls">
         <button class="nav-btn today" onclick="jumpToToday()">Today</button>
         <button class="nav-btn" onclick="moveGrid(-7)">‹</button>
         <input type="date" id="gridFocus" onchange="updateGridFocus()">
         <button class="nav-btn" onclick="moveGrid(7)">›</button>
     </div>
-    <button class="btn-share" onclick="generateShareLink()">🔗 Share</button>
+
+    <button class="btn-share" onclick="generateShareLink()">🔗 Copy Share Link</button>
 </div>
 
 <div class="section-header">INDIVIDUAL TASK BREAKDOWN</div>
-<div class="timeline-container">
+<div class="timeline-container" onclick="handleGridClick(event)">
     <div class="header-row" id="headerRowTop"></div>
     <div id="taskBodyTop"></div>
 </div>
 
 <div class="section-header">CAPACITY SUMMARY</div>
-<div class="timeline-container">
+<div class="timeline-container" onclick="handleGridClick(event)">
     <div class="header-row" id="headerRowBottom"></div>
     <div id="taskBodyBottom"></div>
 </div>
 
 <script>
     const stylishColors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#9d174d', '#64748b', '#d946ef', '#fef3c7'];
-    let selectedColor = stylishColors[0], tasks = [], holidays = [];
+    let selectedColor = stylishColors[0];
+    let tasks = [];
+    let holidays = [];
     
+    const minLimit = new Date(2025, 0, 1);
+    const maxLimit = new Date(2026, 11, 31);
     let gridStartDate = new Date(2025, 11, 29); 
-    const visibleDaysCount = 31, cellW = 60, labelW = 200;
+    const visibleDaysCount = 31; 
+    
+    const cellW = 60;
+    const labelW = 200;
 
     // Palette setup
     const palEl = document.getElementById('palette');
@@ -110,171 +117,200 @@
         palEl.appendChild(d);
     });
 
-    function toISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    // ABSOLUTE DATE HELPER: Prevents timezone drift
+    function getDaysDiff(d1, d2) {
+        const date1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate());
+        const date2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate());
+        return Math.round((date1 - date2) / (1000 * 60 * 60 * 24));
+    }
+
+    function toISO(date) { return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0'); }
     function fromISO(s) { const p = s.split('-'); return new Date(p[0], p[1] - 1, p[2]); }
 
-    function save() { localStorage.setItem('shared_tasks_v26', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v26', JSON.stringify(holidays)); }
+    function save() { localStorage.setItem('shared_tasks_v24', JSON.stringify(tasks)); localStorage.setItem('shared_holidays_v24', JSON.stringify(holidays)); }
     function load() {
         const params = new URLSearchParams(window.location.search);
         const data = params.get('data');
-        if (data) { const d = JSON.parse(atob(data)); tasks = d.tasks; holidays = d.holidays; save(); }
-        else { tasks = JSON.parse(localStorage.getItem('shared_tasks_v26')) || []; holidays = JSON.parse(localStorage.getItem('shared_holidays_v26')) || []; }
-        document.getElementById('gridFocus').value = toISO(gridStartDate);
+        if (data) { 
+            const decoded = JSON.parse(atob(data));
+            tasks = decoded.tasks; holidays = decoded.holidays; save(); 
+        } else {
+            tasks = JSON.parse(localStorage.getItem('shared_tasks_v24')) || [];
+            holidays = JSON.parse(localStorage.getItem('shared_holidays_v24')) || [];
+        }
     }
 
-    function jumpToToday() { gridStartDate = new Date(); document.getElementById('gridFocus').value = toISO(gridStartDate); render(); }
-    function moveGrid(n) { gridStartDate.setDate(gridStartDate.getDate() + n); document.getElementById('gridFocus').value = toISO(gridStartDate); render(); }
-    function updateGridFocus() { gridStartDate = fromISO(document.getElementById('gridFocus').value); render(); }
+    function handleGridClick(e) {
+        if (e.target.closest('.label-cell') || e.target.closest('.task-segment')) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left + e.currentTarget.scrollLeft;
+        if (x > labelW) {
+            const dayIndex = Math.floor((x - labelW) / cellW);
+            const clickedDate = new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate() + dayIndex);
+            toggleHoliday(toISO(clickedDate));
+        }
+    }
+
+    function generateShareLink() {
+        const url = window.location.origin + window.location.pathname + "?data=" + btoa(JSON.stringify({ tasks, holidays }));
+        navigator.clipboard.writeText(url); alert("Link Copied!");
+    }
+
+    function jumpToToday() {
+        gridStartDate = new Date();
+        document.getElementById('gridFocus').value = toISO(gridStartDate);
+        render();
+    }
+
+    function moveGrid(days) {
+        gridStartDate.setDate(gridStartDate.getDate() + days);
+        document.getElementById('gridFocus').value = toISO(gridStartDate);
+        render();
+    }
+
+    function updateGridFocus() {
+        gridStartDate = fromISO(document.getElementById('gridFocus').value);
+        render();
+    }
 
     function getOccDates(t) {
-        let dts = [], work = 0, d = fromISO(t.start);
+        let dts = []; let work = 0; let d = fromISO(t.start);
         while (holidays.includes(toISO(d))) d.setDate(d.getDate() + 1);
         while (work < t.dur) {
             if (!holidays.includes(toISO(d))) { dts.push(toISO(d)); work += 1; }
             d.setDate(d.getDate() + 1);
-            if (d.getFullYear() > 2026) break;
+            if (d > maxLimit) break;
         }
         return dts;
     }
 
     function render() {
-        const days = [];
-        let tempDt = new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate());
+        const days = []; 
         for(let i=0; i < visibleDaysCount; i++) {
-            days.push(new Date(tempDt));
-            tempDt.setDate(tempDt.getDate() + 1);
+            days.push(new Date(gridStartDate.getFullYear(), gridStartDate.getMonth(), gridStartDate.getDate() + i));
         }
 
         let counts = {};
         tasks.forEach(t => getOccDates(t).forEach(d => counts[d] = (counts[d] || 0) + 1));
 
-        const headerHtml = (counts, days) => {
-            return `<div class="cell label-cell">DATE</div>` + days.map(d => {
-                const s = toISO(d);
-                return `<div class="cell ${holidays.includes(s) ? 'holiday' : ''}" onclick="toggleHoliday('${s}')">
-                    ${counts[s]>2?'⚠️':''}<strong>${d.getDate()}</strong><span>${d.toLocaleDateString('en-US',{month:'short'})}</span>
-                </div>`;
-            }).join('');
-        };
+        const hHTML = `<div class="cell label-cell">DATE</div>` + days.map(d => {
+            const s = toISO(d);
+            return `<div class="cell ${holidays.includes(s) ? 'holiday' : ''}"> ${counts[s]>2?'⚠️':''}<strong>${d.getDate()}</strong><br>${d.toLocaleDateString('en-US',{month:'short'})}</div>`;
+        }).join('');
+        
+        document.getElementById('headerRowTop').innerHTML = hHTML;
+        document.getElementById('headerRowBottom').innerHTML = hHTML;
 
-        document.getElementById('headerRowTop').innerHTML = headerHtml(counts, days);
-        document.getElementById('headerRowBottom').innerHTML = headerHtml(counts, days);
+        const bodyTop = document.getElementById('taskBodyTop');
+        bodyTop.innerHTML = '';
+        tasks.forEach((t, i) => {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            row.innerHTML = `<div class="cell label-cell"><span>${t.name}</span><button class="delete-btn" onclick="deleteTask(event, ${i})">×</button></div>` + 
+                            days.map(d => `<div class="cell ${holidays.includes(toISO(d))?'holiday':''}"></div>`).join('');
+            row.appendChild(createBar(t, true, counts));
+            bodyTop.appendChild(row);
+        });
 
-        const renderGrid = (containerId, isSummary = false) => {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            let displayList = isSummary ? getSummaryRows() : tasks.map((t, i) => ({...t, originalIdx: i}));
-
-            displayList.forEach((tOrRow, rowIdx) => {
-                const row = document.createElement('div');
-                row.className = 'task-row';
-                const label = isSummary ? (rowIdx === 0 ? 'MAIN WORK' : 'OVERLOAD') : tOrRow.name;
-                const delBtn = isSummary ? '' : `<button class="delete-btn" onclick="deleteTask(${tOrRow.originalIdx})">×</button>`;
-                
-                row.innerHTML = `<div class="cell label-cell"><span>${label}</span>${delBtn}</div>` + 
-                                days.map(d => `<div class="cell ${holidays.includes(toISO(d))?'holiday':''}" onclick="toggleHoliday('${toISO(d)}')"></div>`).join('');
-                
-                if (isSummary) {
-                    tOrRow.forEach(t => row.appendChild(createBar(t, false, counts, days)));
-                } else {
-                    row.appendChild(createBar(tOrRow, true, counts, days));
-                }
-                container.appendChild(row);
-            });
-        };
-
-        renderGrid('taskBodyTop', false);
-        renderGrid('taskBodyBottom', true);
-    }
-
-    function getSummaryRows() {
+        const bodyBottom = document.getElementById('taskBodyBottom');
+        bodyBottom.innerHTML = '';
         const rows = [[], []];
-        [...tasks].sort((a,b)=>fromISO(a.start)-fromISO(b.start)).forEach(t => {
+        const sortedTasks = [...tasks].sort((a,b)=>fromISO(a.start)-fromISO(b.start));
+        sortedTasks.forEach(t => {
             for(let r=0; r<2; r++) {
                 const occ = getOccDates(t);
-                if (!rows[r].some(et => getOccDates(et).some(ed => occ.includes(ed)))) {
-                    rows[r].push(t); break;
-                }
+                if (!rows[r].some(et => getOccDates(et).some(ed => occ.includes(ed)))) { rows[r].push(t); break; }
             }
         });
-        return rows;
+        rows.forEach((rt, i) => {
+            const row = document.createElement('div'); row.className = 'task-row';
+            row.innerHTML = `<div class="cell label-cell">${i===0?'MAIN WORK':'OVERLOAD'}</div>` + days.map(d=>`<div class="cell ${holidays.includes(toISO(d))?'holiday':''}"></div>`).join('');
+            rt.forEach(t => row.appendChild(createBar(t, false, counts)));
+            bodyBottom.appendChild(row);
+        });
     }
 
-    function createBar(t, interactive, counts, daysWindow) {
+    function createBar(t, interactive, counts) {
         const group = document.createElement('div');
         group.className = 'task-group';
         group.style.setProperty('--task-color', t.color);
         
         let vStart = fromISO(t.start);
         while (holidays.includes(toISO(vStart))) vStart.setDate(vStart.getDate() + 1);
+        
+        const dayDiff = getDaysDiff(vStart, gridStartDate);
+        group.style.left = `${labelW + (dayDiff * cellW)}px`;
 
-        const offsetDays = Math.round((vStart - daysWindow[0]) / 86400000);
-        group.style.left = `${labelW + (offsetDays * cellW)}px`;
-
-        let work = 0, d = new Date(vStart);
+        let work = 0; let d = new Date(vStart.getFullYear(), vStart.getMonth(), vStart.getDate());
         while (work < t.dur) {
-            const s = toISO(d), isH = holidays.includes(s);
-            const dIdx = Math.round((d - daysWindow[0]) / 86400000);
+            const s = toISO(d);
+            const isH = holidays.includes(s);
+            const seg = document.createElement('div');
+            let w = (t.dur - work < 1 && !isH) ? (t.dur - work) : 1;
+            
+            const dIdx = getDaysDiff(d, gridStartDate);
             
             if (dIdx >= 0 && dIdx < visibleDaysCount) {
-                const seg = document.createElement('div');
-                let w = (t.dur - work < 1 && !isH) ? (t.dur - work) : 1;
-                
-                if (isH) {
-                    seg.className = 'task-segment gap';
-                    seg.style.width = cellW + 'px';
+                if (isH) { 
+                    seg.className = 'task-segment gap'; 
+                    seg.style.width = cellW + 'px'; 
                 } else {
                     seg.className = 'task-segment' + (work === 0 ? ' segment-start' : '');
-                    if (counts[s] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
+                    if (counts && counts[s] > 2) seg.innerHTML = `<span class="bar-alert">⚠️</span>`;
                     if (work + w >= t.dur) {
                         seg.classList.add('segment-end');
                         seg.innerHTML += `<span style="padding:0 5px">${t.name}</span>`;
                         seg.style.width = (w * cellW) + 'px';
-                        if (interactive) addResizer(seg, t);
-                    } else seg.style.width = cellW + 'px';
+                        if(interactive) {
+                            const r = document.createElement('div'); r.className = 'resizer';
+                            r.onmousedown = (e) => {
+                                e.stopPropagation(); let sX = e.clientX; let sD = t.dur;
+                                document.onmousemove = (m) => { t.dur = Math.max(0.5, Math.round((sD + (m.clientX - sX)/cellW)*2)/2); render(); };
+                                document.onmouseup = () => { document.onmousemove = null; save(); render(); };
+                            };
+                            seg.appendChild(r);
+                        }
+                    } else { seg.style.width = cellW + 'px'; }
                 }
                 group.appendChild(seg);
             }
             if (!isH) work += 1;
             d.setDate(d.getDate() + 1);
-            if (d.getFullYear() > 2026) break;
+            if (d > maxLimit) break;
         }
 
-        if (interactive) addDragger(group, t);
+        if (interactive) {
+            group.onmousedown = (e) => {
+                if (e.target.className.includes('resizer')) return;
+                e.stopPropagation();
+                let sX = e.clientX; let oS = fromISO(t.start);
+                document.onmousemove = (m) => {
+                    let dlt = Math.round((m.clientX - sX) / cellW);
+                    let nD = new Date(oS.getFullYear(), oS.getMonth(), oS.getDate() + dlt);
+                    if (nD >= minLimit) { t.start = toISO(nD); render(); }
+                };
+                document.onmouseup = () => { document.onmousemove = null; save(); render(); };
+            };
+        }
         return group;
     }
 
-    function addResizer(seg, t) {
-        const r = document.createElement('div'); r.className = 'resizer';
-        r.onmousedown = (e) => {
-            e.stopPropagation(); let sX = e.clientX, sD = t.dur;
-            document.onmousemove = (m) => { t.dur = Math.max(0.5, Math.round((sD + (m.clientX - sX)/cellW)*2)/2); render(); };
-            document.onmouseup = () => { document.onmousemove = null; save(); render(); };
-        };
-        seg.appendChild(r);
+    function toggleHoliday(s) {
+        const i = holidays.indexOf(s);
+        if (i > -1) holidays.splice(i, 1);
+        else holidays.push(s);
+        save(); render();
     }
 
-    function addDragger(group, t) {
-        group.onmousedown = (e) => {
-            if (e.target.className.includes('resizer')) return;
-            let sX = e.clientX, oS = fromISO(t.start);
-            document.onmousemove = (m) => {
-                let dlt = Math.round((m.clientX - sX) / cellW);
-                let nD = new Date(oS.getFullYear(), oS.getMonth(), oS.getDate() + dlt);
-                t.start = toISO(nD); render();
-            };
-            document.onmouseup = () => { document.onmousemove = null; save(); render(); };
-        };
+    function deleteTask(e, i) { 
+        e.stopPropagation();
+        tasks.splice(i, 1); save(); render(); 
     }
-
-    function toggleHoliday(s) { const i = holidays.indexOf(s); i > -1 ? holidays.splice(i,1) : holidays.push(s); save(); render(); }
-    function deleteTask(i) { tasks.splice(i,1); save(); render(); }
+    
     function addTask() {
         const n = document.getElementById('name').value, s = document.getElementById('date').value, d = parseFloat(document.getElementById('dur').value);
         if (n && s && !isNaN(d)) { tasks.push({ name: n, start: s, dur: d, color: selectedColor }); save(); render(); }
     }
-    function generateShareLink() { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?data=" + btoa(JSON.stringify({ tasks, holidays }))); alert("Link Copied!"); }
 
     load(); render();
 </script>
